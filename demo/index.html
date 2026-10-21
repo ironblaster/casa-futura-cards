@@ -14,6 +14,7 @@
       radial-gradient(900px 700px at 60% 110%, rgba(0,255,170,.14), transparent 60%), #000;
   }
   .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; max-width: 860px; }
+  .only .grid { grid-template-columns: minmax(0, 1fr); }
   .wide { grid-column: span 2; grid-row: span 2; }
 </style>
 </head>
@@ -33,6 +34,7 @@ customElements.define('ha-icon', class extends HTMLElement {
 customElements.define('ha-card', class extends HTMLElement {});
 
 const Q = new URLSearchParams(location.search), lang = Q.get('lang') || 'en';
+if (Q.get('only')) document.documentElement.classList.add('only');
 const S = (id, state, attributes) => ({ entity_id: id, state, attributes, last_changed: new Date(Date.now() - 7 * 60000).toISOString() });
 const hass = {
   language: lang, locale: { language: lang }, themes: { darkMode: true },
@@ -42,15 +44,18 @@ const hass = {
     'lock.garage': S('lock.garage', 'unlocked', { friendly_name: 'Garage door' }),
     'light.kitchen': S('light.kitchen', 'on', { friendly_name: 'Kitchen' }),
     'input_boolean.mail': S('input_boolean.mail', 'on', { friendly_name: 'Mail' }),
-    'climate.heating': S('climate.heating', 'heat', { friendly_name: 'Heating', temperature: 21 })
+    'climate.heating': S('climate.heating', 'heat', { friendly_name: 'Heating', temperature: 21 }),
+    'climate.bedroom': S('climate.bedroom', 'cool', { friendly_name: 'Bedroom air conditioner', temperature: 23.5, current_temperature: 25.2, current_humidity: 48,
+      min_temp: 16, max_temp: 31, target_temp_step: 0.5, hvac_action: 'cooling', hvac_modes: ['off', 'heat', 'cool', 'auto', 'dry', 'fan_only'],
+      fan_modes: ['auto', 'low', 'medium', 'high'], fan_mode: 'auto', swing_modes: ['off', 'vertical', 'both'], swing_mode: 'vertical', preset_modes: ['none', 'eco', 'boost', 'sleep'], preset_mode: 'none' })
   },
-  formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
+  formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat', cool: 'Cool' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
   localize: () => ''
 };
 window.__events = [];
 window.addEventListener('hass-action', (e) => window.__events.push(e.detail));
 
-const cards = [
+const cards = Q.get('only') === 'climate' ? [['', { type: 'custom:casa-futura-climate-card', entity: 'climate.bedroom' }]] : [
   ['wide', { type: 'custom:casa-futura-gauge-card', entity: 'sensor.power', name: 'Power now', icon: 'mdi:flash', min: 0, max: 5500, yellow_from: 3500, red_from: 5000 }],
   ['', { type: 'custom:casa-futura-action-card', entity: 'lock.front_door', name: 'Front door', color: [92, 242, 166], confirm: true, pin: '1234',
     choices: [{ label: 'Unlock', icon: 'mdi:lock-open-variant', color: [255, 198, 92], when: 'locked', action: { action: 'perform-action', perform_action: 'lock.unlock' } },

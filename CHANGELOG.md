@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- New `casa-futura-climate-card`: a thermostat dial with modes, fan speed, presets and swing, labels translated by Home Assistant.
+
 ## 1.0.0
 
 First release with three cards:

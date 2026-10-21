@@ -18,6 +18,7 @@ Card in stile vetro per le dashboard di Home Assistant e i tablet a muro: grandi
 | `custom:casa-futura-gauge-card` | Un grande quadrante con lancetta per qualsiasi sensore (consumo, temperatura, umidità…) con zone verde, gialla e rossa. |
 | `custom:casa-futura-alerts-card` | Non si vede sulla dashboard: quando c'è qualcosa da segnalare compare una campanella luminosa in alto a destra. Toccandola si apre l'elenco degli avvisi. |
 | `custom:casa-futura-action-card` | Un pulsante con conferma, PIN e più scelte facoltativi, per esempio una porta con Sblocca / Apri / Blocca. |
+| `custom:casa-futura-climate-card` | Una ghiera per qualsiasi condizionatore o termostato: si trascina l'anello o si usano − e +, con modalità, ventola, preset e oscillazione. |
 
 Tutte hanno l'editor visuale per ogni opzione, usano le azioni standard di Home Assistant, **non richiedono browser_mod** (le finestre di conferma e PIN le disegnano le card) e sono tradotte in italiano, inglese, tedesco, francese e spagnolo.
 

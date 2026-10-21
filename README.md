@@ -23,6 +23,7 @@ Liquid glass cards for Home Assistant dashboards and wall tablets. Big, readable
 | `custom:casa-futura-gauge-card` | A big needle gauge for any sensor (power, temperature, humidity…) with green, yellow and red zones. |
 | `custom:casa-futura-alerts-card` | Invisible on the dashboard: a glowing bell appears at the top right when something needs attention. Tap it to see the list. |
 | `custom:casa-futura-action-card` | A button with optional confirmation, PIN and several choices, e.g. a door with Unlock / Open / Lock. |
+| `custom:casa-futura-climate-card` | A thermostat dial for any climate entity: drag the ring or use − and +, with modes, fan speed, presets and swing. |
 
 All of them:
 
@@ -153,6 +154,26 @@ choices:
 | `min_height` | `120` | In pixels. |
 
 > The PIN keeps curious hands away from a wall tablet. It is not real security: anyone who can edit the dashboard can change it.
+
+## Climate
+
+![Climate](https://raw.githubusercontent.com/ironblaster/casa-futura-cards/main/images/climate.png)
+
+```yaml
+type: custom:casa-futura-climate-card
+entity: climate.bedroom
+temperature_entity: sensor.bedroom_temperature   # optional
+humidity_entity: sensor.bedroom_humidity         # optional
+```
+
+Drag the ring to choose the temperature, or use − and +: the new value is sent after a short pause, so several taps make one call. The ring and the active mode take the color of the mode (orange heat, blue cool, green auto, cyan dry, violet fan). Modes, fan speeds, presets and swing come from your device and are named in your language by Home Assistant.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `entity` | required | A `climate.*` entity. |
+| `name`, `icon` | from the entity | |
+| `temperature_entity`, `humidity_entity` | | Room sensors to show instead of the ones of the device. |
+| `show_modes`, `show_fan`, `show_presets`, `show_swing` | `true` | Hide the sections you do not need. |
 
 ## Appearance (all cards)
 
