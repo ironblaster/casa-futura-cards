@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Casa Futura Cards – demo</title>
+<style>
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: system-ui, sans-serif; color: #eef4ff; padding: 28px; box-sizing: border-box; min-height: 100vh;
+    background:
+      radial-gradient(900px 620px at 0% 0%, rgba(0,170,255,.26), transparent 60%),
+      radial-gradient(820px 600px at 100% 6%, rgba(150,70,255,.26), transparent 60%),
+      radial-gradient(900px 700px at 60% 110%, rgba(0,255,170,.14), transparent 60%), #000;
+  }
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; max-width: 860px; }
+  .wide { grid-column: span 2; grid-row: span 2; }
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script>
+/* demo-only stand-ins for Home Assistant elements; the icon font must be declared in the page (Chrome ignores @font-face in shadow roots) */
+const MDI = 'https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css';
+document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="' + MDI + '">');
+customElements.define('ha-icon', class extends HTMLElement {
+  static get observedAttributes() { return ['icon']; }
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  connectedCallback() { this._r(); } attributeChangedCallback() { this._r(); }
+  _r() { const n = String(this.getAttribute('icon') || '').replace('mdi:', '');
+    this.shadowRoot.innerHTML = '<link rel="stylesheet" href="' + MDI + '"><style>:host{display:inline-flex;align-items:center;justify-content:center;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px)}i{font-size:var(--mdc-icon-size,24px);line-height:1}</style><i class="mdi mdi-' + n + '"></i>'; }
+});
+customElements.define('ha-card', class extends HTMLElement {});
+
+const Q = new URLSearchParams(location.search), lang = Q.get('lang') || 'en';
+const S = (id, state, attributes) => ({ entity_id: id, state, attributes, last_changed: new Date(Date.now() - 7 * 60000).toISOString() });
+const hass = {
+  language: lang, locale: { language: lang }, themes: { darkMode: true },
+  states: {
+    'sensor.power': S('sensor.power', '846', { unit_of_measurement: 'W', device_class: 'power', friendly_name: 'Power now' }),
+    'lock.front_door': S('lock.front_door', 'locked', { friendly_name: 'Front door' }),
+    'lock.garage': S('lock.garage', 'unlocked', { friendly_name: 'Garage door' }),
+    'light.kitchen': S('light.kitchen', 'on', { friendly_name: 'Kitchen' }),
+    'input_boolean.mail': S('input_boolean.mail', 'on', { friendly_name: 'Mail' }),
+    'climate.heating': S('climate.heating', 'heat', { friendly_name: 'Heating', temperature: 21 })
+  },
+  formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
+  localize: () => ''
+};
+window.__events = [];
+window.addEventListener('hass-action', (e) => window.__events.push(e.detail));
+
+const cards = [
+  ['wide', { type: 'custom:casa-futura-gauge-card', entity: 'sensor.power', name: 'Power now', icon: 'mdi:flash', min: 0, max: 5500, yellow_from: 3500, red_from: 5000 }],
+  ['', { type: 'custom:casa-futura-action-card', entity: 'lock.front_door', name: 'Front door', color: [92, 242, 166], confirm: true, pin: '1234',
+    choices: [{ label: 'Unlock', icon: 'mdi:lock-open-variant', color: [255, 198, 92], when: 'locked', action: { action: 'perform-action', perform_action: 'lock.unlock' } },
+              { label: 'Open', icon: 'mdi:door-open', color: [95, 243, 255], when: 'locked', action: { action: 'perform-action', perform_action: 'lock.open' } },
+              { label: 'Lock', icon: 'mdi:lock', color: [92, 242, 166], when: 'unlocked', action: { action: 'perform-action', perform_action: 'lock.lock' } }] }],
+  ['', { type: 'custom:casa-futura-action-card', entity: 'lock.garage', name: 'Garage door', color: [255, 198, 92], confirm: true,
+    choices: [{ label: 'Lock', icon: 'mdi:lock', color: [92, 242, 166], when: 'unlocked', action: { action: 'perform-action', perform_action: 'lock.lock' } }] }],
+  ['', { type: 'custom:casa-futura-action-card', entity: 'light.kitchen', name: 'Kitchen', icon: 'mdi:ceiling-light', color: [255, 198, 92] }],
+  ['', { type: 'custom:casa-futura-action-card', name: 'All off', icon: 'mdi:power', label: 'Every light', color: [255, 107, 125], confirm: true, confirm_text: 'Turn off every light?',
+    tap_action: { action: 'perform-action', perform_action: 'light.turn_off', target: { entity_id: 'all' } } }],
+  ['', { type: 'custom:casa-futura-alerts-card', bell_top: 22, bell_right: 22, alerts: [
+    { entity: 'input_boolean.mail', condition: 'on', text: 'You have mail', icon: 'mdi:mailbox', color: [255, 198, 92] },
+    { entity: 'lock.garage', condition: 'equals', value: 'unlocked', text: 'Garage door unlocked', icon: 'mdi:lock-open-variant', color: [255, 107, 125] },
+    { entity: 'climate.heating', condition: 'not_equals', value: 'off', text: 'Heating on', icon: 'mdi:radiator', color: [255, 154, 82], attribute: 'temperature', suffix: '°' }] }]
+];
+
+const s = document.createElement('script');
+s.src = '../dist/casa-futura-cards.js';
+s.onload = () => {
+  cards.forEach(([cls, cfg]) => {
+    const slot = document.createElement('div'); if (cls) slot.className = cls;
+    const el = document.createElement(cfg.type.replace('custom:', ''));
+    el.setConfig(cfg); slot.appendChild(el); document.getElementById('grid').appendChild(slot); el.hass = hass;
+  });
+  setTimeout(() => {
+    if (Q.get('open') === 'pin') document.querySelectorAll('casa-futura-action-card')[0].shadowRoot.getElementById('b').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })),
+      document.querySelectorAll('casa-futura-action-card')[0].shadowRoot.getElementById('b').dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    if (Q.get('open') === 'bell') { const r = document.querySelector('[data-casa-futura-alerts]').shadowRoot; r.getElementById('pan').style.transition = 'none'; r.getElementById('scrim').style.transition = 'none'; r.getElementById('bell').click(); }
+  }, 400);
+};
+document.head.appendChild(s);
+</script>
+</body>
+</html>
