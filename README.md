@@ -4,7 +4,7 @@
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
 [![GitHub release](https://img.shields.io/github/v/release/ironblaster/casa-futura-cards)](https://github.com/ironblaster/casa-futura-cards/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4)](https://github.com/sponsors/ironblaster)
 
 Liquid glass cards for Home Assistant dashboards and wall tablets. Big, readable from a distance, and fully configurable from the visual editor.
 
@@ -190,6 +190,10 @@ Colors can be written as `[r, g, b]`, `"#rrggbb"` or `"r, g, b"`.
 ## Development
 
 One JavaScript file, no build step and no dependencies. Serve the folder (`python3 -m http.server`) and open `demo/index.html`.
+
+## Support
+
+If Casa Futura makes your home a little nicer, you can [sponsor the project on GitHub](https://github.com/sponsors/ironblaster). Thank you!
 
 ## The Casa Futura family
 

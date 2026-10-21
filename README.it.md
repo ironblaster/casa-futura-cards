@@ -3,7 +3,7 @@
 # Casa Futura Cards
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
-[![Licenza: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Licenza: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4)](https://github.com/sponsors/ironblaster)
 
 Card in stile vetro per le dashboard di Home Assistant e i tablet a muro: grandi, leggibili da lontano e configurabili tutte dall'editor visuale.
 
@@ -72,6 +72,10 @@ choices:
 Il PIN tiene lontani i curiosi da un tablet a muro, ma non è una vera sicurezza: chi può modificare la dashboard può cambiarlo.
 
 Tutte le opzioni di ogni card, con valori ed esempi, sono nel [README in inglese](README.md): i nomi delle opzioni sono gli stessi.
+
+## Sostieni il progetto
+
+Se Casa Futura ti piace, puoi [sostenere il progetto su GitHub Sponsors](https://github.com/sponsors/ironblaster). Grazie!
 
 ## La famiglia Casa Futura
 
