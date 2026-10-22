@@ -36,7 +36,7 @@ Tutte hanno l'editor visuale per ogni opzione, usano le azioni standard di Home 
 ### A mano
 
 1. Scarica `casa-futura-cards.js` dall'[ultima versione](https://github.com/ironblaster/casa-futura-cards/releases) e copialo in `config/www/`.
-2. In **Impostazioni → Plance → ⋮ → Risorse** aggiungi `/local/casa-futura-cards.js?v=1.3.0` come **modulo JavaScript**. Quando aggiorni il file a mano cambia anche il numero dopo `?v=`, perché Home Assistant lascia i file di `/local` a lungo nella cache del browser.
+2. In **Impostazioni → Plance → ⋮ → Risorse** aggiungi `/local/casa-futura-cards.js?v=1.3.1` come **modulo JavaScript**. Quando aggiorni il file a mano cambia anche il numero dopo `?v=`, perché Home Assistant lascia i file di `/local` a lungo nella cache del browser.
 
 ## Esempio: robot con mappa e pulizie rapide
 
@@ -140,6 +140,7 @@ Se Casa Futura ti piace, puoi [sostenere il progetto su GitHub Sponsors](https:/
 - [Glass Clock Weather Card](https://github.com/ironblaster/glass-clock-weather-card): un orologio grande con il meteo animato.
 - [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): quadrante, campanella degli avvisi, pulsanti con PIN, clima, luci, robot e telecamere.
 - [Casa Futura Theme](https://github.com/ironblaster/casa-futura-theme): il tema scuro in stile vetro.
+- [Casa Futura Kiosk](https://github.com/ironblaster/casa-futura-kiosk): colore della barra di stato, zoom e ritorno alla home per i tablet a muro.
 
 ## Licenza
 

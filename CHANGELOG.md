@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- The windows of the cards and the alerts panel close on the `casa-futura-close` event, so [Casa Futura Kiosk](https://github.com/ironblaster/casa-futura-kiosk) can close them before going back home.
+
 ## 1.3.0
 
 - New `casa-futura-camera-card`: camera snapshots in a strip or a grid that refresh only while on screen, a badge from any sensor (e.g. a person seen by Frigate), and live video on tap in a window drawn by the card, with arrows to move between cameras.

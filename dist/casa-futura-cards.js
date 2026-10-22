@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.3.1';
   var REPO = 'https://github.com/ironblaster/casa-futura-cards';
   if (window.__casaFuturaCards) return;
   window.__casaFuturaCards = VERSION;
@@ -216,6 +216,10 @@
 
   /* ================================================================ dialog drawn by the cards (no browser_mod needed) */
 
+  // windows drawn by the cards; the 'casa-futura-close' event (sent e.g. by Casa Futura Kiosk) closes them all
+  var DIALOGS = [];
+  window.addEventListener('casa-futura-close', function () { DIALOGS.slice().forEach(function (d) { d.close(); }); });
+
   function openDialog(owner, c, build) {
     var p = document.createElement('div');
     p.setAttribute('data-casa-futura-dialog', '');
@@ -254,8 +258,12 @@
     document.body.appendChild(p);
     var api = {
       root: r, el: r.getElementById('dlg'),
-      close: function () { if (p.parentNode) p.parentNode.removeChild(p); document.removeEventListener('keydown', onKey); }
+      close: function () {
+        if (p.parentNode) p.parentNode.removeChild(p); document.removeEventListener('keydown', onKey);
+        var i = DIALOGS.indexOf(api); if (i >= 0) DIALOGS.splice(i, 1);
+      }
     };
+    DIALOGS.push(api);
     function onKey(e) { if (e.key === 'Escape') api.close(); }
     document.addEventListener('keydown', onKey);
     r.getElementById('scrim').addEventListener('click', function (e) { if (e.target.id === 'scrim') api.close(); });
@@ -687,6 +695,7 @@
     disconnectedCallback() {
       if (this._portal) { this._portal.remove(); this._portal = null; }
       if (this._onKey) { document.removeEventListener('keydown', this._onKey); this._onKey = null; }
+      if (this._onClose) { window.removeEventListener('casa-futura-close', this._onClose); this._onClose = null; }
       this._open = false;
     }
     getCardSize() { return this._preview || this._edit ? 1 : 0; }
@@ -736,6 +745,7 @@
       r.getElementById('scrim').addEventListener('click', function () { self._toggle(false); });
       this._swipe(r.getElementById('pan'));
       if (!this._onKey) { this._onKey = function (e) { if (e.key === 'Escape') self._toggle(false); }; document.addEventListener('keydown', this._onKey); }
+      if (!this._onClose) { this._onClose = function () { self._toggle(false); }; window.addEventListener('casa-futura-close', this._onClose); }
     }
     _toggle(v) {
       if (!this._portal) return;

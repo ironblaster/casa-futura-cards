@@ -47,7 +47,7 @@ All of them:
 ### Manual
 
 1. Download `casa-futura-cards.js` from the [latest release](https://github.com/ironblaster/casa-futura-cards/releases) into `config/www/`.
-2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.3.0` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
+2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.3.1` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
 
 ## Gauge
 
@@ -292,6 +292,7 @@ If Casa Futura makes your home a little nicer, you can [sponsor the project on G
 - [Glass Clock Weather Card](https://github.com/ironblaster/glass-clock-weather-card): a big clock with animated weather.
 - [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): gauge, alerts bell, action buttons with PIN, climate, light, vacuum and cameras.
 - [Casa Futura Theme](https://github.com/ironblaster/casa-futura-theme): the dark liquid glass theme.
+- [Casa Futura Kiosk](https://github.com/ironblaster/casa-futura-kiosk): status bar color, zoom and return home for wall tablets.
 
 ## License
 
