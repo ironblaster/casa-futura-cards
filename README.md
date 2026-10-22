@@ -24,6 +24,8 @@ Liquid glass cards for Home Assistant dashboards and wall tablets. Big, readable
 | `custom:casa-futura-alerts-card` | Invisible on the dashboard: a glowing bell appears at the top right when something needs attention. Tap it to see the list. |
 | `custom:casa-futura-action-card` | A button with optional confirmation, PIN and several choices, e.g. a door with Unlock / Open / Lock. |
 | `custom:casa-futura-climate-card` | A thermostat dial for any climate entity: drag the ring or use − and +, with modes, fan speed, presets and swing. |
+| `custom:casa-futura-light-card` | A big brightness slider with white temperature, colors and the lights of a group, each with its own switch. |
+| `custom:casa-futura-vacuum-card` | A robot vacuum with its map, battery, start / stop / dock / locate, your quick cleanings and the station sensors. |
 
 All of them:
 
@@ -44,7 +46,7 @@ All of them:
 ### Manual
 
 1. Download `casa-futura-cards.js` from the [latest release](https://github.com/ironblaster/casa-futura-cards/releases) into `config/www/`.
-2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.0.0` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
+2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.2.0` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
 
 ## Gauge
 
@@ -175,6 +177,64 @@ Drag the ring to choose the temperature, or use − and +: the new value is sent
 | `temperature_entity`, `humidity_entity` | | Room sensors to show instead of the ones of the device. |
 | `show_modes`, `show_fan`, `show_presets`, `show_swing` | `true` | Hide the sections you do not need. |
 
+## Light
+
+![Light](https://raw.githubusercontent.com/ironblaster/casa-futura-cards/main/images/light.png)
+
+```yaml
+type: custom:casa-futura-light-card
+entity: light.living_room
+exclude:                     # optional: lights of the group you do not want listed
+  - light.wall_switch
+```
+
+Drag the big slider to set the brightness (all the way down turns the light off). It is vertical on wide cards and turns horizontal when the card is narrow. White temperature and colors appear only when the light supports them. For a light group, every light of the group gets its own switch.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `entity` | required | A `light.*` entity or light group. |
+| `name`, `icon` | from the entity | |
+| `show_temperature`, `show_colors`, `show_members` | `true` | Hide the sections you do not need. |
+| `exclude` | | Lights of the group to hide. In YAML it can also be a regular expression, e.g. `"_effect_|wled"`. |
+| `colors` | two whites and ten colors | Your own color buttons, e.g. `["#ff9a52", [95, 243, 255]]`. |
+| `min_height` | | In pixels. |
+
+## Vacuum
+
+![Vacuum](https://raw.githubusercontent.com/ironblaster/casa-futura-cards/main/images/vacuum.png)
+
+```yaml
+type: custom:casa-futura-vacuum-card
+entity: vacuum.first_floor
+map: image.first_floor_map          # optional: a camera or image entity
+battery: sensor.first_floor_battery # optional
+room: sensor.first_floor_current_room
+quick:
+  - label: Clean the bathroom
+    icon: mdi:shower-head
+    action:
+      action: perform-action
+      perform_action: script.clean_bathroom
+station:
+  - entity: sensor.first_floor_dust_bag
+    label: Dust bag
+    icon: mdi:delete-variant
+```
+
+The map refreshes every 5 seconds while the robot cleans or returns, every minute otherwise. The battery ring turns amber below 50% and red below 20%. Start becomes Pause while cleaning, and the buttons your robot does not support are hidden. States are named in your language by Home Assistant and by the robot's integration.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `entity` | required | A `vacuum.*` entity. |
+| `name`, `icon` | from the entity | |
+| `map` | | A `camera.*` or `image.*` entity with the map (Roborock, Dreame, Xiaomi Cloud Map Extractor, Valetudo…). |
+| `battery` | the `battery_level` attribute | A battery sensor. Newer integrations have one instead of the attribute. |
+| `status`, `room`, `area`, `time`, `error` | | Sensors shown under the state: detailed status, current room, cleaned area, cleaning time, error. The error shows only when there is one. |
+| `show_controls` | `true` | Start / pause, stop, dock and locate buttons. |
+| `quick` | | Buttons with `label`, `icon`, `color` and any Home Assistant `action`. |
+| `station` | | Rows with `entity`, `label` and `icon` for tanks, dust bag and other dock sensors. |
+| `min_height` | | In pixels. |
+
 ## Appearance (all cards)
 
 | Option | Default | Description |
@@ -198,7 +258,7 @@ If Casa Futura makes your home a little nicer, you can [sponsor the project on G
 ## The Casa Futura family
 
 - [Glass Clock Weather Card](https://github.com/ironblaster/glass-clock-weather-card): a big clock with animated weather.
-- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): gauge, alerts bell and action buttons with PIN.
+- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): gauge, alerts bell, action buttons with PIN, climate, light and vacuum.
 - [Casa Futura Theme](https://github.com/ironblaster/casa-futura-theme): the dark liquid glass theme.
 
 ## License

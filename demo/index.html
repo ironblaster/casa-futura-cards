@@ -47,15 +47,43 @@ const hass = {
     'climate.heating': S('climate.heating', 'heat', { friendly_name: 'Heating', temperature: 21 }),
     'climate.bedroom': S('climate.bedroom', 'cool', { friendly_name: 'Bedroom air conditioner', temperature: 23.5, current_temperature: 25.2, current_humidity: 48,
       min_temp: 16, max_temp: 31, target_temp_step: 0.5, hvac_action: 'cooling', hvac_modes: ['off', 'heat', 'cool', 'auto', 'dry', 'fan_only'],
-      fan_modes: ['auto', 'low', 'medium', 'high'], fan_mode: 'auto', swing_modes: ['off', 'vertical', 'both'], swing_mode: 'vertical', preset_modes: ['none', 'eco', 'boost', 'sleep'], preset_mode: 'none' })
+      fan_modes: ['auto', 'low', 'medium', 'high'], fan_mode: 'auto', swing_modes: ['off', 'vertical', 'both'], swing_mode: 'vertical', preset_modes: ['none', 'eco', 'boost', 'sleep'], preset_mode: 'none' }),
+    'light.living_room': S('light.living_room', 'on', { friendly_name: 'Living room spotlights', brightness: 166, color_mode: 'hs', rgb_color: [255, 154, 82],
+      supported_color_modes: ['color_temp', 'hs'], min_color_temp_kelvin: 2200, max_color_temp_kelvin: 6500, color_temp_kelvin: 3600,
+      entity_id: ['light.spot_1', 'light.spot_2', 'light.wall_switch'] }),
+    'light.spot_1': S('light.spot_1', 'on', { friendly_name: 'Spot left' }),
+    'light.spot_2': S('light.spot_2', 'off', { friendly_name: 'Spot right' }),
+    'light.wall_switch': S('light.wall_switch', 'on', { friendly_name: 'Wall switch' }),
+    'vacuum.first_floor': S('vacuum.first_floor', 'docked', { friendly_name: 'First floor robot', supported_features: 8192 | 4 | 8 | 16 | 512 }),
+    'image.first_floor_map': S('image.first_floor_map', '2026-10-22', { entity_picture: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240"><rect x="30" y="20" width="70" height="80" fill="#9fd3ff"/><rect x="104" y="40" width="60" height="70" fill="#a9c8ff"/><rect x="30" y="104" width="50" height="60" fill="#a6d98a"/><rect x="84" y="114" width="80" height="80" fill="#f4d27a"/><rect x="50" y="168" width="60" height="40" fill="#8fb0ff"/></svg>') }),
+    'sensor.robot_battery': S('sensor.robot_battery', '100', { unit_of_measurement: '%', device_class: 'battery' }),
+    'sensor.robot_status': S('sensor.robot_status', 'sleeping', {}),
+    'sensor.robot_room': S('sensor.robot_room', 'Hallway', {}),
+    'sensor.robot_area': S('sensor.robot_area', '3', { unit_of_measurement: 'm²' }),
+    'sensor.robot_time': S('sensor.robot_time', '4', { unit_of_measurement: 'min' }),
+    'sensor.robot_error': S('sensor.robot_error', 'no_error', {}),
+    'sensor.clean_water': S('sensor.clean_water', 'Installed', {}),
+    'sensor.dirty_water': S('sensor.dirty_water', 'Installed', {}),
+    'sensor.dust_bag': S('sensor.dust_bag', 'Installed', {})
   },
-  formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat', cool: 'Cool' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
+  callService: (d, s, data) => window.__events.push({ service: d + '.' + s, data }),
+  formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat', cool: 'Cool', docked: 'Docked', cleaning: 'Cleaning', sleeping: 'Sleeping' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
   localize: () => ''
 };
 window.__events = [];
 window.addEventListener('hass-action', (e) => window.__events.push(e.detail));
 
-const cards = Q.get('only') === 'climate' ? [['', { type: 'custom:casa-futura-climate-card', entity: 'climate.bedroom' }]] : [
+const ONLY = {
+  climate: [['', { type: 'custom:casa-futura-climate-card', entity: 'climate.bedroom' }]],
+  light: [['', { type: 'custom:casa-futura-light-card', entity: 'light.living_room', exclude: ['light.wall_switch'] }]],
+  vacuum: [['', { type: 'custom:casa-futura-vacuum-card', entity: 'vacuum.first_floor', map: 'image.first_floor_map', battery: 'sensor.robot_battery',
+    status: 'sensor.robot_status', room: 'sensor.robot_room', area: 'sensor.robot_area', time: 'sensor.robot_time', error: 'sensor.robot_error',
+    quick: [{ label: 'Clean the bathroom', icon: 'mdi:shower-head', action: { action: 'perform-action', perform_action: 'script.clean_bathroom' } },
+            { label: 'Clean the 1st floor', icon: 'mdi:home-floor-1', action: { action: 'perform-action', perform_action: 'vacuum.start' } }],
+    station: [{ entity: 'sensor.clean_water', label: 'Clean water', icon: 'mdi:water' }, { entity: 'sensor.dirty_water', label: 'Dirty water', icon: 'mdi:water-opacity' },
+              { entity: 'sensor.dust_bag', label: 'Dust bag', icon: 'mdi:delete-variant' }] }]]
+};
+const cards = ONLY[Q.get('only')] || [
   ['wide', { type: 'custom:casa-futura-gauge-card', entity: 'sensor.power', name: 'Power now', icon: 'mdi:flash', min: 0, max: 5500, yellow_from: 3500, red_from: 5000 }],
   ['', { type: 'custom:casa-futura-action-card', entity: 'lock.front_door', name: 'Front door', color: [92, 242, 166], confirm: true, pin: '1234',
     choices: [{ label: 'Unlock', icon: 'mdi:lock-open-variant', color: [255, 198, 92], when: 'locked', action: { action: 'perform-action', perform_action: 'lock.unlock' } },

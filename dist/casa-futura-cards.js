@@ -5,6 +5,8 @@
  *   casa-futura-alerts-card  a floating bell with a side panel of alerts
  *   casa-futura-action-card  a button with optional confirmation, PIN and several choices
  *   casa-futura-climate-card a thermostat dial with modes, fan speed, presets and swing
+ *   casa-futura-light-card   a brightness slider with white temperature, colors and group members
+ *   casa-futura-vacuum-card  a robot vacuum with map, battery, controls, quick cleanings and station
  *
  * https://github.com/ironblaster/casa-futura-cards
  * Released under the MIT License.
@@ -12,7 +14,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var REPO = 'https://github.com/ironblaster/casa-futura-cards';
   if (window.__casaFuturaCards) return;
   window.__casaFuturaCards = VERSION;
@@ -68,6 +70,56 @@
     if (!action || !action.action || action.action === 'none') return;
     fire(node, 'hass-action', { config: { entity: entity, tap_action: action }, action: 'tap' });
   }
+  // a track you drag on: live feedback while dragging, onChange when the finger lifts
+  // vertical can be a function, read at every move (the light card turns its slider when the card is narrow)
+  function slider(node, track, vertical, onInput, onChange) {
+    var dragging = false;
+    track.style.touchAction = 'none';
+    function val(e) {
+      var r = track.getBoundingClientRect(), v = typeof vertical === 'function' ? vertical() : vertical;
+      return clamp(v ? 1 - (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width, 0, 1);
+    }
+    track.addEventListener('pointerdown', function (e) {
+      if (e.button) return;
+      dragging = true;
+      try { track.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ }
+      onInput(val(e)); e.preventDefault();
+    });
+    track.addEventListener('pointermove', function (e) { if (dragging) onInput(val(e)); });
+    track.addEventListener('pointerup', function (e) {
+      if (!dragging) return;
+      dragging = false;
+      try { track.releasePointerCapture(e.pointerId); } catch (x) { /* ignore */ }
+      haptic(node); onChange(val(e));
+    });
+    track.addEventListener('pointercancel', function () { dragging = false; });
+    return { busy: function () { return dragging; } };
+  }
+  function hsToRgb(h, s) {
+    s /= 100; var c = s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = 1 - c, r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  // approximate color of a white light at this temperature in kelvin
+  function kToRgb(k) {
+    var t = k / 100, r, g, b;
+    if (t <= 66) { r = 255; g = 99.47 * Math.log(t) - 161.12; b = t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04; }
+    else { r = 329.7 * Math.pow(t - 60, -0.1332); g = 288.12 * Math.pow(t - 60, -0.0755); b = 255; }
+    return [r, g, b].map(function (v) { return clamp(Math.round(v), 0, 255); });
+  }
+  // switch a card between its wide and narrow layout by its own width (works in every view type)
+  function watchWidth(card, el, limit) {
+    if (card._ro) card._ro.disconnect();
+    if (!window.ResizeObserver) return;
+    card._ro = new ResizeObserver(function (en) {
+      var n = en[0].contentRect.width < limit;
+      if (el.classList.contains('narrow') === n) return;
+      el.classList.toggle('narrow', n);
+      if (card._hass) card._update();
+    });
+    card._ro.observe(el);
+  }
 
   var ACC = { cyan: '95,243,255', violet: '185,139,255', amber: '255,198,92', red: '255,107,125', green: '92,242,166', blue: '106,168,255', orange: '255,154,82' };
   var FONT_URL = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap';
@@ -102,6 +154,25 @@
     fr: { cancel: 'Annuler', confirm: 'Confirmer', done: 'Terminé', close: 'Fermer', pin_for: 'Saisis le code pour', pin: 'Saisis le code', wrong: 'Code erroné', alerts: 'Alertes', choose: 'Que veux-tu faire ?', sure: 'Tu confirmes ?' },
     es: { cancel: 'Cancelar', confirm: 'Confirmar', done: 'Hecho', close: 'Cerrar', pin_for: 'Introduce el PIN para', pin: 'Introduce el PIN', wrong: 'PIN incorrecto', alerts: 'Avisos', choose: '¿Qué quieres hacer?', sure: '¿Estás seguro?' }
   };
+  // texts of the light and vacuum cards
+  var PT = {
+    en: { state: 'State', white: 'White temperature', colors: 'Colors', members: 'Lights in the group', missing: 'Entity not found',
+      start: 'Start', pause: 'Pause', stop: 'Stop', dock: 'Dock', locate: 'Locate', quick: 'Quick cleaning', station: 'Station',
+      room: 'Room', area: 'Cleaned', time: 'Time', no_map: 'Map not available' },
+    it: { state: 'Stato', white: 'Temperatura del bianco', colors: 'Colori', members: 'Luci del gruppo', missing: 'Entità non trovata',
+      start: 'Avvia', pause: 'Pausa', stop: 'Stop', dock: 'Base', locate: 'Trova', quick: 'Pulizie rapide', station: 'Stazione',
+      room: 'Stanza', area: 'Pulito', time: 'Tempo', no_map: 'Mappa non disponibile' },
+    de: { state: 'Status', white: 'Weißton', colors: 'Farben', members: 'Lampen der Gruppe', missing: 'Entität nicht gefunden',
+      start: 'Start', pause: 'Pause', stop: 'Stopp', dock: 'Station', locate: 'Finden', quick: 'Schnellreinigung', station: 'Station',
+      room: 'Raum', area: 'Gereinigt', time: 'Zeit', no_map: 'Keine Karte verfügbar' },
+    fr: { state: 'État', white: 'Température du blanc', colors: 'Couleurs', members: 'Lampes du groupe', missing: 'Entité introuvable',
+      start: 'Démarrer', pause: 'Pause', stop: 'Arrêt', dock: 'Base', locate: 'Localiser', quick: 'Nettoyages rapides', station: 'Station',
+      room: 'Pièce', area: 'Nettoyé', time: 'Durée', no_map: 'Carte non disponible' },
+    es: { state: 'Estado', white: 'Temperatura del blanco', colors: 'Colores', members: 'Luces del grupo', missing: 'Entidad no encontrada',
+      start: 'Iniciar', pause: 'Pausa', stop: 'Parar', dock: 'Base', locate: 'Localizar', quick: 'Limpiezas rápidas', station: 'Estación',
+      room: 'Habitación', area: 'Limpiado', time: 'Tiempo', no_map: 'Mapa no disponible' }
+  };
+  function ptr(hass, k) { var t = PT[baseLang(langOf(hass))] || PT.en; return t[k] || PT.en[k]; }
   function tr(hass, k, n) {
     var t = T[baseLang(langOf(hass))] || T.en, s = t[k] != null ? t[k] : T.en[k];
     return n != null ? String(s).replace('{n}', n) : s;
@@ -218,7 +289,13 @@
       s_sections: 'Sections', temperature_entity: 'Room temperature sensor (optional)', humidity_entity: 'Room humidity sensor (optional)',
       show_modes: 'Modes', show_fan: 'Fan speed', show_presets: 'Presets', show_swing: 'Swing',
       alerts_h: 'Each alert shows up in the panel while its condition is true. The first one gives its color to the bell.',
-      choices_h: 'With more than one choice a window lets you pick what to do. Without choices the tap action is used.'
+      choices_h: 'With more than one choice a window lets you pick what to do. Without choices the tap action is used.',
+      show_temperature: 'White temperature', show_colors: 'Colors', show_members: 'Lights in the group', exclude: 'Lights to hide from the group',
+      s_sensors: 'Sensors (optional)', map: 'Map (camera or image entity)', battery: 'Battery', status: 'Detailed status', room: 'Current room',
+      area: 'Cleaned area', time: 'Cleaning time', error: 'Error', show_controls: 'Start, stop, dock and locate buttons',
+      s_quick: 'Quick cleaning', quick_h: 'Buttons for the cleanings you start often: a script, a room, a whole floor.', add_quick: 'Add a quick cleaning',
+      s_station: 'Station', station_h: 'Water tanks, dust bag and other sensors of the dock, shown as a list.', add_station: 'Add a station sensor',
+      q_label: 'Button text', st_label: 'Text'
     },
     it: {
       s_main: 'Principale', s_scale: 'Scala e colori', s_look: 'Aspetto', s_actions: 'Interazioni', s_bell: 'Campanella', s_choices: 'Scelte', s_alerts: 'Avvisi', s_security: 'Conferma e PIN',
@@ -236,7 +313,13 @@
       s_sections: 'Sezioni', temperature_entity: 'Sensore temperatura della stanza (facoltativo)', humidity_entity: 'Sensore umidità della stanza (facoltativo)',
       show_modes: 'Modalità', show_fan: 'Velocità ventola', show_presets: 'Preset', show_swing: 'Oscillazione',
       alerts_h: 'Ogni avviso compare nel pannello finché la sua condizione è vera. Il primo dà il colore alla campanella.',
-      choices_h: 'Con più di una scelta si apre una finestra per decidere cosa fare. Senza scelte si usa l’azione al tocco.'
+      choices_h: 'Con più di una scelta si apre una finestra per decidere cosa fare. Senza scelte si usa l’azione al tocco.',
+      show_temperature: 'Temperatura del bianco', show_colors: 'Colori', show_members: 'Luci del gruppo', exclude: 'Luci da nascondere dal gruppo',
+      s_sensors: 'Sensori (facoltativi)', map: 'Mappa (entità camera o immagine)', battery: 'Batteria', status: 'Stato dettagliato', room: 'Stanza attuale',
+      area: 'Superficie pulita', time: 'Tempo di pulizia', error: 'Errore', show_controls: 'Pulsanti avvia, stop, base e trova',
+      s_quick: 'Pulizie rapide', quick_h: 'Pulsanti per le pulizie che avvii spesso: uno script, una stanza, un piano intero.', add_quick: 'Aggiungi una pulizia rapida',
+      s_station: 'Stazione', station_h: 'Serbatoi dell’acqua, sacchetto della polvere e altri sensori della base, mostrati in elenco.', add_station: 'Aggiungi un sensore della stazione',
+      q_label: 'Testo del pulsante', st_label: 'Testo'
     }
   };
 
@@ -255,7 +338,11 @@
   // a base for the three editors: one ha-form plus optional lists of items, each edited with its own small ha-form
   class CFEditor extends HTMLElement {
     setConfig(c) { this._config = Object.assign({}, c || {}); this._draw(); }
-    set hass(h) { this._hass = h; if (this._form) { this._form.hass = h; (this._rows || []).forEach(function (r) { r.hass = h; }); } else this._draw(); }
+    set hass(h) {
+      var ls = this._ls || {};
+      this._hass = h;
+      if (this._form) { this._form.hass = h; Object.keys(ls).forEach(function (k) { (ls[k].rows || []).forEach(function (r) { r.hass = h; }); }); } else this._draw();
+    }
     connectedCallback() { this._draw(); }
     _L(k) { var t = ET[baseLang(langOf(this._hass))] || ET.en; return t[k] != null ? t[k] : (ET.en[k] != null ? ET.en[k] : k); }
     _emit(cfg) { this._config = cfg; fire(this, 'config-changed', { config: cfg }); this._draw(); }
@@ -292,7 +379,13 @@
       this._form.hass = this._hass;
       this._form.schema = this._schema();
       this._form.data = this._data();
-      if (this._listKey) this._drawList();
+      this._lists().forEach(function (d) { self._drawList(d); });
+    }
+    // the lists of items this editor shows under the form; one by default, the vacuum editor has two
+    _lists() {
+      if (!this._listKey) return [];
+      return [{ key: this._listKey, title: this._listTitle, help: this._listHelp, add: this._listAdd,
+        newItem: this._newItem.bind(this), schema: this._itemSchema.bind(this), data: this._itemData.bind(this) }];
     }
     _fromForm(v) { return this._clean(v, this._defaults()); }
     _section(title, icon, schema, expanded) { return { type: 'expandable', name: '', title: this._L(title), icon: icon, flatten: true, expanded: !!expanded, schema: schema }; }
@@ -304,30 +397,33 @@
       s.push({ name: 'border_radius', selector: { number: { min: 0, max: 64, step: 1, mode: 'slider', unit_of_measurement: 'px' } } });
       return s;
     }
-    // list of items (alerts or choices)
-    _drawList() {
-      var self = this, L = this._L.bind(this), host = this._root.getElementById('list'), key = this._listKey;
+    // list of items (alerts, choices, quick cleanings…)
+    _drawList(d) {
+      var self = this, L = this._L.bind(this), host = this._root.getElementById('list'), key = d.key;
       var items = Array.isArray(this._config[key]) ? this._config[key] : [];
-      if (!this._panel) {
+      this._ls = this._ls || {};
+      var ls = this._ls[key] || (this._ls[key] = {});
+      if (!ls.panel) {
         var p = document.createElement('ha-expansion-panel');
-        p.outlined = true; p.setAttribute('outlined', ''); p.header = L(this._listTitle); p.expanded = true;
-        p.innerHTML = '<div class="list"><p class="help">' + esc(L(this._listHelp)) + '</p><div id="rows"></div>' +
-          '<button class="b" id="add"><ha-icon icon="mdi:plus"></ha-icon>' + esc(L(this._listAdd)) + '</button></div>';
+        p.outlined = true; p.setAttribute('outlined', ''); p.header = L(d.title); p.expanded = d.expanded !== false;
+        if (host.children.length) p.style.marginTop = '12px';
+        p.innerHTML = '<div class="list"><p class="help">' + esc(L(d.help)) + '</p><div class="rows"></div>' +
+          '<button class="b add"><ha-icon icon="mdi:plus"></ha-icon>' + esc(L(d.add)) + '</button></div>';
         host.appendChild(p);
-        this._panel = p;
-        p.querySelector('#add').addEventListener('click', function () {
-          var list = (self._config[key] || []).slice(); list.push(self._newItem());
+        ls.panel = p;
+        p.querySelector('.add').addEventListener('click', function () {
+          var list = (self._config[key] || []).slice(); list.push(d.newItem());
           var cfg = Object.assign({}, self._config); cfg[key] = list; self._emit(cfg);
         });
       }
-      var rowsEl = this._panel.querySelector('#rows');
-      if (this._rowsKey !== items.length) {
-        this._rowsKey = items.length; rowsEl.innerHTML = ''; this._rows = [];
+      var rowsEl = ls.panel.querySelector('.rows');
+      if (ls.rowsKey !== items.length) {
+        ls.rowsKey = items.length; rowsEl.innerHTML = ''; ls.rows = [];
         items.forEach(function (it, i) {
           var row = document.createElement('div'); row.className = 'row';
           var f = document.createElement('ha-form');
           f.hass = self._hass;
-          f.computeLabel = function (s) { return L(s.name); };
+          f.computeLabel = function (s) { return L((d.labels && d.labels[s.name]) || s.name); };
           f.addEventListener('value-changed', function (ev) {
             ev.stopPropagation();
             var list = (self._config[key] || []).slice();
@@ -339,7 +435,7 @@
             var up = document.createElement('button'); up.className = 'i'; up.title = L('up'); up.innerHTML = '<ha-icon icon="mdi:arrow-up"></ha-icon>';
             up.addEventListener('click', function () {
               var list = (self._config[key] || []).slice(); var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t;
-              var cfg = Object.assign({}, self._config); cfg[key] = list; self._rowsKey = null; self._emit(cfg);
+              var cfg = Object.assign({}, self._config); cfg[key] = list; ls.rowsKey = null; self._emit(cfg);
             });
             tools.appendChild(up);
           }
@@ -350,12 +446,12 @@
           });
           tools.appendChild(del);
           row.appendChild(f); row.appendChild(tools); rowsEl.appendChild(row);
-          self._rows.push(f);
+          ls.rows.push(f);
         });
       }
       items.forEach(function (it, i) {
-        var f = self._rows[i]; if (!f) return;
-        f.hass = self._hass; f.schema = self._itemSchema(it); f.data = self._itemData(it);
+        var f = ls.rows[i]; if (!f) return;
+        f.hass = self._hass; f.schema = d.schema(it); f.data = d.data(it);
       });
     }
     _cleanItem(it) {
@@ -1159,19 +1255,444 @@
     }
   }
 
+  /* ================================================================ shared style of the light and vacuum cards */
+
+  var PANEL_CSS = ':host{height:100%}' +
+    '.pc{display:block;height:100%;padding:20px 22px 22px}' +
+    '.hd{display:flex;align-items:center;gap:14px;margin-bottom:16px}' +
+    '.orb{--ic:26px;width:52px;height:52px;border-radius:18px;flex:none;display:flex;align-items:center;justify-content:center;color:rgba(var(--cf-text),.7);' +
+    '  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);transition:all .35s}' +
+    '.orb.on{color:rgb(var(--a));background:radial-gradient(circle at 50% 30%,rgba(var(--a),.42),rgba(var(--a),.1) 72%);border-color:rgba(var(--a),.55);box-shadow:0 0 30px rgba(var(--a),.35)}' +
+    '.hd .tx{flex:1;min-width:0}.hd .t{font-size:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.hd .s{font-size:14px;opacity:.6;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.lbl{font-size:12px;letter-spacing:.2em;text-transform:uppercase;opacity:.5;margin:18px 2px 10px}' +
+    '.row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:20px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);margin-bottom:8px}' +
+    '.row .k{flex:1;opacity:.75;font-size:15px;display:flex;align-items:center;gap:10px;--ic:20px;min-width:0}' +
+    '.row .k span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row .v{font-size:16px;font-weight:500;text-align:right}' +
+    '.pill{--a:' + ACC.cyan + ';display:flex;align-items:center;justify-content:center;gap:10px;--ic:24px;min-height:60px;padding:0 16px;border-radius:20px;font-size:16px;font-weight:500;' +
+    '  background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.14);transition:transform .12s,background .25s,box-shadow .25s}' +
+    '.pill.on{background:linear-gradient(160deg,rgba(var(--a),.48),rgba(var(--a),.16));border-color:rgba(var(--a),.75);box-shadow:0 0 26px rgba(var(--a),.36)}' +
+    '.pill:active{transform:scale(.95)}' +
+    '.tg{--a:' + ACC.amber + ';position:relative;width:88px;height:50px;border-radius:999px;flex:none;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);' +
+    '  box-shadow:inset 0 2px 8px rgba(0,0,0,.4);transition:all .3s}' +
+    '.tg::after{content:"";position:absolute;top:4px;left:4px;width:40px;height:40px;border-radius:50%;background:linear-gradient(180deg,#fff,#cdd7e6);' +
+    '  box-shadow:0 4px 12px rgba(0,0,0,.45);transition:transform .35s cubic-bezier(.3,1.5,.5,1)}' +
+    '.tg.on{background:linear-gradient(90deg,rgba(var(--a),.85),rgba(var(--a),.5));border-color:rgba(var(--a),.85);box-shadow:0 0 24px rgba(var(--a),.45)}' +
+    '.tg.on::after{transform:translateX(38px)}' +
+    '.tg.sm{transform:scale(.8);margin:-6px -8px}' +
+    '.body{display:flex;gap:24px;align-items:flex-start}.narrow .body{flex-direction:column;align-items:stretch}' +
+    '.miss{opacity:.6}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}';
+
+  function headHTML(icon) {
+    return '<div class="hd"><div class="orb" id="orb"><ha-icon id="hic" icon="' + esc(icon) + '"></ha-icon></div>' +
+      '<div class="tx"><div class="t" id="nm"></div><div class="s" id="st"></div></div></div>';
+  }
+
+  /* ================================================================ 5. light: brightness, white temperature, colors, group members */
+
+  var LIGHT_DEF = Object.assign({ entity: null, name: '', icon: '', show_temperature: true, show_colors: true, show_members: true, exclude: [], min_height: 0 }, LOOK_DEF);
+  var SWATCH = [[0, 90], [22, 95], [42, 90], [60, 85], [120, 70], [175, 80], [205, 85], [240, 75], [275, 70], [315, 70]];
+
+  class CasaFuturaLightCard extends HTMLElement {
+    static getConfigElement() { return document.createElement('casa-futura-light-card-editor'); }
+    static getStubConfig(hass) { return { entity: Object.keys((hass && hass.states) || {}).filter(function (e) { return e.indexOf('light.') === 0; })[0] || '' }; }
+    constructor() { super(); this.attachShadow({ mode: 'open' }); }
+    setConfig(c) {
+      if (!c || !c.entity) throw new Error('entity is required');
+      this._config = Object.assign({}, LIGHT_DEF, c); this._built = false; this._key = null;
+      if (this._hass) this._build();
+    }
+    set hass(h) {
+      var old = this._hass, c = this._config; this._hass = h;
+      if (!c) return;
+      var s = st(h, c.entity), a = (s && s.attributes) || {};
+      var key = s ? JSON.stringify([a.supported_color_modes, a.min_color_temp_kelvin, a.max_color_temp_kelvin, this._members(s)]) : '';
+      if (!this._built || key !== this._key) { this._key = key; this._build(); return; }
+      var ids = [c.entity].concat(this._members(s));
+      for (var i = 0; i < ids.length; i++) if (!old || old.states[ids[i]] !== h.states[ids[i]]) { this._update(); return; }
+    }
+    connectedCallback() { if (this._built) watchWidth(this, this._$('root'), 520); }
+    disconnectedCallback() { if (this._ro) { this._ro.disconnect(); this._ro = null; } }
+    getCardSize() { return 7; }
+    getGridOptions() { return { columns: 12, rows: 6, min_columns: 6, min_rows: 4 }; }
+    _$(id) { return this.shadowRoot.getElementById(id); }
+    _call(service, data, entity) { var p = service.split('.'); this._hass.callService(p[0], p[1], Object.assign({ entity_id: entity || this._config.entity }, data)); }
+    // the lights of a group, without the ones listed in exclude (a list of entities, or a regular expression in YAML)
+    _members(s) {
+      var c = this._config, ex = c.exclude, re = null;
+      if (c.show_members === false || !s || !Array.isArray(s.attributes.entity_id)) return [];
+      if (typeof ex === 'string' && ex) { try { re = new RegExp(ex); } catch (e) { re = null; } }
+      var list = Array.isArray(ex) ? ex : [];
+      return s.attributes.entity_id.filter(function (e) { return e !== c.entity && list.indexOf(e) < 0 && !(re && re.test(e)); });
+    }
+    _build() {
+      var c = this._config, h = this._hass, self = this, s = st(h, c.entity), a = (s && s.attributes) || {};
+      var modes = a.supported_color_modes || ['onoff'];
+      this._dim = modes.some(function (m) { return m !== 'onoff'; });
+      this._ct = c.show_temperature !== false && modes.indexOf('color_temp') >= 0;
+      this._col = c.show_colors !== false && modes.some(function (m) { return ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'].indexOf(m) >= 0; });
+      var minK = a.min_color_temp_kelvin || 2000, maxK = a.max_color_temp_kelvin || 6500;
+      this._k = [minK, Math.max(maxK, minK + 1)];
+      var ctGrad = 'linear-gradient(90deg,' + [minK, (minK + maxK) / 2, maxK].map(function (k) { return 'rgb(' + kToRgb(k).join(',') + ')'; }).join(',') + ')';
+      // custom colors from YAML, otherwise two whites (when supported) and ten colors
+      var sw = Array.isArray(c.colors) && c.colors.length ? c.colors.map(function (x) { return { rgb: rgb(x, null) }; }).filter(function (x) { return x.rgb; })
+        : (modes.indexOf('color_temp') >= 0 ? [{ k: 2700 }, { k: 4000 }] : []).concat(SWATCH.map(function (x) { return { hs: x }; }));
+      var mem = this._members(s);
+      this.shadowRoot.innerHTML = '<style>' + BASE + PANEL_CSS +
+        '.left{flex:none;display:flex;justify-content:center}.right{flex:1;min-width:0}' +
+        '.vs{--a:' + ACC.amber + ';position:relative;width:140px;height:320px;border-radius:42px;overflow:hidden;cursor:ns-resize;' +
+        '  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 3px 14px rgba(0,0,0,.5),0 0 0 6px rgba(255,255,255,.03)}' +
+        '.narrow .vs{width:100%;height:84px;border-radius:28px;cursor:ew-resize}' +
+        '.fill{position:absolute;left:0;right:0;bottom:0;height:0;transition:height .25s ease,width .25s ease;' +
+        '  background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(var(--a),.95) 38%,rgba(var(--a),.75));box-shadow:0 0 40px rgba(var(--a),.6)}' +
+        '.narrow .fill{top:0;right:auto;height:auto!important;background:linear-gradient(270deg,rgba(255,255,255,.85),rgba(var(--a),.95) 38%,rgba(var(--a),.75))}' +
+        '.pct{position:absolute;top:20px;left:0;right:0;text-align:center;font-size:28px;font-weight:300;mix-blend-mode:difference;color:#fff;pointer-events:none}' +
+        '.narrow .pct{top:50%;transform:translateY(-50%)}' +
+        '.vsi{position:absolute;bottom:20px;left:50%;margin-left:-14px;--ic:28px;color:rgba(0,0,0,.55);pointer-events:none}.narrow .vsi{display:none}' +
+        '.power{--a:' + ACC.amber + ';width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;--ic:64px;' +
+        '  background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.14),rgba(255,255,255,.03) 70%);border:1px solid rgba(255,255,255,.16);' +
+        '  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 20px 50px rgba(0,0,0,.45);transition:all .35s;color:rgba(var(--cf-text),.6);font-size:17px}' +
+        '.power.on{color:#fff;background:radial-gradient(circle at 50% 30%,rgba(var(--a),.75),rgba(var(--a),.25) 72%);border-color:rgba(var(--a),.8);box-shadow:0 0 60px rgba(var(--a),.55)}' +
+        '.power:active{transform:scale(.96)}.narrow .power{width:150px;height:150px;--ic:48px}' +
+        '.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-radius:22px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}' +
+        '.top .k{font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.55}.top .v{font-size:20px;font-weight:500;margin-top:2px}' +
+        '.trk{position:relative;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 2px 8px rgba(0,0,0,.35);cursor:ew-resize}' +
+        '.thumb{position:absolute;top:3px;width:46px;height:46px;margin-left:-23px;border-radius:15px;background:rgba(255,255,255,.9);' +
+        '  box-shadow:0 4px 14px rgba(0,0,0,.45),0 0 0 3px rgba(255,255,255,.35);transition:left .2s;pointer-events:none}' +
+        '.sw{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}' +
+        '.sw button{height:50px;border-radius:16px;border:2px solid rgba(255,255,255,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 8px 18px rgba(0,0,0,.3);transition:transform .1s}' +
+        '.sw button:active{transform:scale(.92)}' +
+        '</style><ha-card class="glass pc' + (c.glass === false ? ' plain' : '') + '" id="root"' + (num(c.min_height) ? ' style="min-height:' + num(c.min_height) + 'px"' : '') + '>' +
+        headHTML(c.icon || 'mdi:lightbulb') +
+        (!s ? '<div class="miss">' + esc(ptr(h, 'missing')) + ': ' + esc(c.entity) + '</div>' :
+        '<div class="body"><div class="left">' +
+        (this._dim ? '<div class="vs" id="vs"><div class="fill" id="fill"></div><div class="pct" id="pct"></div><ha-icon class="vsi" icon="mdi:brightness-6"></ha-icon></div>'
+          : '<button class="power" id="pwr"><ha-icon icon="mdi:power"></ha-icon><span id="pwrl"></span></button>') +
+        '</div><div class="right">' +
+        '<div class="top"><div><div class="k">' + esc(ptr(h, 'state')) + '</div><div class="v" id="sv"></div></div><button class="tg" id="tg" aria-label="toggle"></button></div>' +
+        (this._ct ? '<div class="lbl">' + esc(ptr(h, 'white')) + '</div><div class="trk" id="ct" style="background:' + ctGrad + '"><div class="thumb" id="ctth"></div></div>' : '') +
+        (this._col ? '<div class="lbl">' + esc(ptr(h, 'colors')) + '</div><div class="sw" id="sw">' + sw.map(function (x, i) {
+          var col = x.k ? kToRgb(x.k).join(',') : x.hs ? hsToRgb(x.hs[0], x.hs[1]).join(',') : x.rgb;
+          return '<button data-i="' + i + '" style="background:rgb(' + col + ')"></button>';
+        }).join('') + '</div>' : '') +
+        (mem.length ? '<div class="lbl">' + esc(ptr(h, 'members')) + '</div><div id="mem">' + mem.map(function (e) {
+          return '<div class="row" data-e="' + esc(e) + '"><div class="k"><ha-icon icon="mdi:lightbulb-outline"></ha-icon><span>' + esc(((st(h, e) || {}).attributes || {}).friendly_name || e) + '</span></div>' +
+            '<div class="v" style="font-size:14px;opacity:.6"></div><button class="tg sm" aria-label="toggle"></button></div>';
+        }).join('') + '</div>' : '') +
+        '</div></div>') + '</ha-card>';
+      var root = this._$('root');
+      lookVars(root, c);
+      this._built = true;
+      if (this.isConnected) watchWidth(this, root, 520);
+      if (!s) { this._$('nm').textContent = c.name || c.entity; return; }
+      this._$('tg').addEventListener('click', function () { haptic(self); self._call('light.toggle', {}); });
+      if (this._dim) {
+        // vertical on wide cards, horizontal on narrow ones
+        this._drag = slider(this, this._$('vs'), function () { return !root.classList.contains('narrow'); }, function (p) { self._fill(p); }, function (p) {
+          var pc = Math.round(p * 100);
+          if (pc <= 1) self._call('light.turn_off', {}); else self._call('light.turn_on', { brightness_pct: pc });
+        });
+      } else {
+        this._$('pwr').addEventListener('click', function () { haptic(self, 'medium'); self._call('light.toggle', {}); });
+      }
+      if (this._ct) {
+        this._ctDrag = slider(this, this._$('ct'), false, function (p) { self._$('ctth').style.left = (p * 100) + '%'; }, function (p) {
+          self._call('light.turn_on', { color_temp_kelvin: Math.round(self._k[0] + p * (self._k[1] - self._k[0])) });
+        });
+      }
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('#sw button'), function (b) {
+        b.addEventListener('click', function () {
+          var x = sw[+b.getAttribute('data-i')]; haptic(self);
+          if (x.k) self._call('light.turn_on', { color_temp_kelvin: x.k });
+          else if (x.hs) self._call('light.turn_on', { hs_color: x.hs });
+          else self._call('light.turn_on', { rgb_color: rgbArr(x.rgb) });
+        });
+      });
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('#mem .row'), function (r) {
+        r.querySelector('.tg').addEventListener('click', function () { haptic(self); self._call('light.toggle', {}, r.getAttribute('data-e')); });
+      });
+      this._update();
+    }
+    _fill(p) {
+      var f = this._$('fill'), pc = this._$('pct'), narrow = this._$('root').classList.contains('narrow');
+      if (f) { f.style.height = narrow ? '' : (p * 100) + '%'; f.style.width = narrow ? (p * 100) + '%' : ''; }
+      if (pc) pc.textContent = Math.round(p * 100) + '%';
+    }
+    _update() {
+      var c = this._config, h = this._hass, s = st(h, c.entity), self = this; if (!s) return;
+      var on = s.state === 'on', a = s.attributes;
+      var acc = on && a.rgb_color && a.color_mode !== 'color_temp' ? rgb(a.rgb_color, ACC.amber) : ACC.amber;
+      var root = this._$('root'); root.style.setProperty('--a', acc);
+      this._$('nm').textContent = c.name || a.friendly_name || c.entity;
+      this._$('st').textContent = stateText(h, s) + (on && a.brightness ? ' · ' + Math.round(a.brightness / 2.55) + '%' : '');
+      this._$('sv').textContent = stateText(h, s);
+      this._$('orb').classList.toggle('on', on);
+      this._$('hic').setAttribute('icon', c.icon || a.icon || (on ? 'mdi:lightbulb-on' : 'mdi:lightbulb-outline'));
+      this._$('tg').classList.toggle('on', on);
+      if (this._dim) { if (!this._drag.busy()) this._fill(on ? (a.brightness || 255) / 255 : 0); }
+      else { this._$('pwr').classList.toggle('on', on); this._$('pwrl').textContent = stateText(h, s); }
+      if (this._ct && !this._ctDrag.busy()) {
+        var k = a.color_temp_kelvin || (this._k[0] + this._k[1]) / 2;
+        this._$('ctth').style.left = clamp((k - this._k[0]) / (this._k[1] - this._k[0]) * 100, 0, 100) + '%';
+      }
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('#mem .row'), function (r) {
+        var m = st(h, r.getAttribute('data-e'));
+        r.querySelector('.tg').classList.toggle('on', !!m && m.state === 'on');
+        r.querySelector('.v').textContent = m ? stateText(h, m) : '—';
+      });
+    }
+  }
+
+  class CasaFuturaLightCardEditor extends CFEditor {
+    _defaults() { return LIGHT_DEF; }
+    _data() { var d = Object.assign({}, LIGHT_DEF, this._config); if (!Array.isArray(d.exclude)) d.exclude = []; return d; }
+    _schema() {
+      var c = this._config;
+      var sec = [{ type: 'grid', name: '', schema: [
+        { name: 'show_temperature', selector: { boolean: {} } }, { name: 'show_colors', selector: { boolean: {} } }, { name: 'show_members', selector: { boolean: {} } }
+      ] }];
+      if (c.show_members !== false && typeof c.exclude !== 'string') sec.push({ name: 'exclude', selector: { entity: { multiple: true, filter: { domain: 'light' } } } });
+      return [
+        this._section('s_main', 'mdi:lightbulb', [
+          { name: 'entity', selector: { entity: { filter: { domain: 'light' } } } },
+          { type: 'grid', name: '', schema: [{ name: 'name', selector: { text: {} } }, { name: 'icon', selector: { icon: {} } }] }
+        ], true),
+        this._section('s_sections', 'mdi:view-list-outline', sec),
+        this._section('s_look', 'mdi:format-paint', this._lookSchema().concat([
+          { name: 'min_height', selector: { number: { min: 0, max: 900, step: 10, mode: 'slider', unit_of_measurement: 'px' } } }
+        ]))
+      ];
+    }
+  }
+
+  /* ================================================================ 6. vacuum: map, battery, controls, quick cleanings, station */
+
+  var VACUUM_DEF = Object.assign({ entity: null, name: '', icon: '', map: null, battery: null, status: null, room: null, area: null, time: null, error: null,
+    show_controls: true, quick: [], station: [], min_height: 0 }, LOOK_DEF);
+  // VacuumEntityFeature bits
+  var VF = { pause: 4, stop: 8, dock: 16, locate: 512, start: 8192 };
+
+  class CasaFuturaVacuumCard extends HTMLElement {
+    static getConfigElement() { return document.createElement('casa-futura-vacuum-card-editor'); }
+    static getStubConfig(hass) {
+      var ids = Object.keys((hass && hass.states) || {}), v = ids.filter(function (e) { return e.indexOf('vacuum.') === 0; })[0] || '';
+      var base = v.split('.')[1] || '#';
+      var map = ids.filter(function (e) { return /^(camera|image)\./.test(e) && e.indexOf(base) > 0; })[0];
+      return map ? { entity: v, map: map } : { entity: v };
+    }
+    constructor() { super(); this.attachShadow({ mode: 'open' }); }
+    setConfig(c) {
+      if (!c || !c.entity) throw new Error('entity is required');
+      this._config = Object.assign({}, VACUUM_DEF, c);
+      if (!c.station && Array.isArray(c.tanks)) this._config.station = c.tanks;
+      this._built = false; this._lastMap = 0;
+      if (this._hass) this._build();
+    }
+    set hass(h) {
+      var old = this._hass, c = this._config; this._hass = h;
+      if (!c) return;
+      var s = st(h, c.entity), key = s ? String(s.attributes.supported_features) : '';
+      if (!this._built || key !== this._key) { this._key = key; this._build(); return; }
+      var ids = this._watch();
+      for (var i = 0; i < ids.length; i++) if (!old || old.states[ids[i]] !== h.states[ids[i]]) { this._update(); return; }
+    }
+    connectedCallback() {
+      var self = this;
+      if (this._built) watchWidth(this, this._$('root'), 620);
+      if (!this._iv) this._iv = setInterval(function () { self._map(); }, 5000);
+      this._map(true);
+    }
+    disconnectedCallback() { clearInterval(this._iv); this._iv = null; if (this._ro) { this._ro.disconnect(); this._ro = null; } }
+    getCardSize() { return 8; }
+    getGridOptions() { return { columns: 12, rows: 7, min_columns: 6, min_rows: 5 }; }
+    _$(id) { return this.shadowRoot.getElementById(id); }
+    _watch() {
+      var c = this._config;
+      return [c.entity, c.map, c.battery, c.status, c.room, c.area, c.time, c.error].concat((c.station || []).map(function (t) { return t && t.entity; })).filter(Boolean);
+    }
+    _can(f) { var s = st(this._hass, this._config.entity), sf = s && s.attributes.supported_features; return sf == null || !!(sf & f); }
+    _call(service) { var p = service.split('.'); this._hass.callService(p[0], p[1], { entity_id: this._config.entity }); }
+    _build() {
+      var c = this._config, h = this._hass, self = this, s = st(h, c.entity);
+      var quick = (c.quick || []).filter(function (q) { return q && (q.label || q.icon); }), station = (c.station || []).filter(function (t) { return t && t.entity; });
+      var btn = function (id, icon, label, a, f) { return self._can(f) ? '<button class="pill" id="' + id + '" style="--a:' + a + '"><ha-icon id="' + id + 'ic" icon="' + icon + '"></ha-icon><span id="' + id + 'l">' + esc(label) + '</span></button>' : ''; };
+      this.shadowRoot.innerHTML = '<style>' + BASE + PANEL_CSS +
+        '.map{flex:1 1 0;min-width:0;position:relative;border-radius:24px;overflow:hidden;min-height:300px;display:flex;align-items:center;justify-content:center;' +
+        '  background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 2px 10px rgba(0,0,0,.35)}' +
+        '.map img{width:100%;height:100%;object-fit:contain;max-height:440px}.map .none{opacity:.4;padding:20px;text-align:center}' +
+        '.narrow .map{min-height:200px;flex:none}' +
+        '.right{flex:1 1 0;min-width:0}.narrow .right{flex:none}' +
+        '.stat{display:flex;align-items:center;gap:18px}' +
+        '.ring{position:relative;width:104px;height:104px;flex:none}.ring>svg{width:100%;height:100%;transform:rotate(-90deg)}' +
+        '.ring b{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:400}' +
+        '.ring b small{font-size:.5em;opacity:.6}' +
+        '.big{font-size:28px;font-weight:400;line-height:1.15}.det{opacity:.6;font-size:14px;margin-top:6px;line-height:1.4}' +
+        '.err{color:rgb(' + ACC.red + ');font-size:15px;margin-top:6px}' +
+        '.ctrl{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:10px;margin-top:16px}' +
+        '.ctrl .pill{flex-direction:column;min-height:74px;font-size:13px;gap:4px;padding:0 4px}.narrow .ctrl{gap:8px}' +
+        '.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}' +
+        '.quick .pill{min-height:60px;justify-content:flex-start;padding:0 16px;text-align:left}' +
+        '.spin{animation:spin 3s linear infinite}' +
+        '</style><ha-card class="glass pc' + (c.glass === false ? ' plain' : '') + '" id="root"' + (num(c.min_height) ? ' style="min-height:' + num(c.min_height) + 'px"' : '') + '>' +
+        headHTML(c.icon || 'mdi:robot-vacuum') +
+        (!s ? '<div class="miss">' + esc(ptr(h, 'missing')) + ': ' + esc(c.entity) + '</div>' :
+        '<div class="body">' + (c.map ? '<div class="map" id="mapbox"><img id="map" alt=""><div class="none" id="nomap" style="display:none">' + esc(ptr(h, 'no_map')) + '</div></div>' : '') +
+        '<div class="right"><div class="stat"><div class="ring" id="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="10"/>' +
+        '<circle id="bat" cx="60" cy="60" r="50" fill="none" stroke="rgb(' + ACC.green + ')" stroke-width="10" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" style="transition:stroke-dashoffset .6s"/></svg>' +
+        '<b id="batt">—</b></div><div style="min-width:0"><div class="big" id="big"></div><div class="det" id="det"></div><div class="err" id="err"></div></div></div>' +
+        (c.show_controls !== false ? '<div class="ctrl">' +
+          btn('go', 'mdi:play', ptr(h, 'start'), ACC.green, VF.start) + btn('stop', 'mdi:stop', ptr(h, 'stop'), ACC.red, VF.stop) +
+          btn('home', 'mdi:home-import-outline', ptr(h, 'dock'), ACC.cyan, VF.dock) + btn('find', 'mdi:map-marker-radius', ptr(h, 'locate'), ACC.amber, VF.locate) + '</div>' : '') +
+        (quick.length ? '<div class="lbl">' + esc(ptr(h, 'quick')) + '</div><div class="quick" id="quick">' + quick.map(function (q, i) {
+          return '<button class="pill" data-i="' + i + '" style="--a:' + rgb(q.color, ACC.violet) + '"><ha-icon icon="' + esc(q.icon || 'mdi:broom') + '"></ha-icon><span>' + esc(q.label || '') + '</span></button>';
+        }).join('') + '</div>' : '') +
+        (station.length ? '<div class="lbl">' + esc(ptr(h, 'station')) + '</div><div id="station"></div>' : '') +
+        '</div></div>') + '</ha-card>';
+      var root = this._$('root');
+      lookVars(root, c);
+      this._built = true;
+      if (this.isConnected) watchWidth(this, root, 620);
+      if (!s) { this._$('nm').textContent = c.name || c.entity; return; }
+      var on = function (id, fn) { var el = self._$(id); if (el) el.addEventListener('click', function () { haptic(self, 'medium'); fn(); }); };
+      on('go', function () {
+        var v = st(self._hass, c.entity);
+        self._call(v && v.state === 'cleaning' && self._can(VF.pause) ? 'vacuum.pause' : 'vacuum.start');
+      });
+      on('stop', function () { self._call('vacuum.stop'); });
+      on('home', function () { self._call('vacuum.return_to_base'); });
+      on('find', function () { self._call('vacuum.locate'); });
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('#quick .pill'), function (b) {
+        b.addEventListener('click', function () {
+          var q = quick[+b.getAttribute('data-i')]; haptic(self, 'medium');
+          b.classList.add('on'); setTimeout(function () { b.classList.remove('on'); }, 1500);
+          runAction(self, q.action || q.tap_action, c.entity);
+        });
+      });
+      var img = this._$('map');
+      if (img) {
+        img.addEventListener('error', function () { img.style.display = 'none'; self._$('nomap').style.display = ''; });
+        img.addEventListener('load', function () { img.style.display = ''; self._$('nomap').style.display = 'none'; });
+      }
+      this._lastMap = 0;
+      this._update();
+    }
+    // the map refreshes every 5 seconds while cleaning, every minute otherwise
+    _map(force) {
+      var c = this._config, img = this._$('map'); if (!img || !c.map || !this._hass) return;
+      var s = st(this._hass, c.entity), m = st(this._hass, c.map);
+      if (!m || !m.attributes.entity_picture) { img.style.display = 'none'; this._$('nomap').style.display = ''; return; }
+      var busy = s && (s.state === 'cleaning' || s.state === 'returning'), now = Date.now();
+      if (!force && !busy && this._lastMap && now - this._lastMap < 60000) return;
+      this._lastMap = now;
+      var url = m.attributes.entity_picture;
+      img.src = /^(data|blob):/.test(url) ? url : url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + now;
+    }
+    _update() {
+      var c = this._config, h = this._hass, s = st(h, c.entity); if (!s) return;
+      var a = s.attributes, cleaning = s.state === 'cleaning', err = s.state === 'error';
+      var root = this._$('root'); root.style.setProperty('--a', err ? ACC.red : ACC.cyan);
+      this._$('nm').textContent = c.name || a.friendly_name || c.entity;
+      var stt = st(h, c.status);
+      this._$('st').textContent = stateText(h, stt && stt.state !== 'unknown' && stt.state !== 'unavailable' ? stt : s);
+      this._$('orb').classList.toggle('on', cleaning || s.state === 'returning' || err);
+      this._$('hic').classList.toggle('spin', cleaning);
+      this._$('big').textContent = stateText(h, s);
+      var bs = st(h, c.battery), b = bs ? num(bs.state) : num(a.battery_level);
+      this._$('ring').style.display = b == null ? 'none' : '';
+      if (b != null) {
+        this._$('batt').innerHTML = Math.round(b) + '<small>%</small>';
+        var circ = this._$('bat'); circ.setAttribute('stroke-dashoffset', String(314 - 314 * clamp(b, 0, 100) / 100));
+        circ.setAttribute('stroke', 'rgb(' + (b < 20 ? ACC.red : b < 50 ? ACC.amber : ACC.green) + ')');
+      }
+      var val = function (id) { var x = st(h, id); return x && x.state !== 'unknown' && x.state !== 'unavailable' ? stateText(h, x) : null; };
+      this._$('det').textContent = [['room', c.room], ['area', c.area], ['time', c.time]].filter(function (d) { return d[1] && val(d[1]); })
+        .map(function (d) { return ptr(h, d[0]) + ': ' + val(d[1]); }).join('  ·  ');
+      var es = st(h, c.error);
+      this._$('err').textContent = es && !/^(no_error|none|ok|unknown|unavailable|0|off|false)$/i.test(es.state) ? '⚠ ' + stateText(h, es) : '';
+      if (this._$('go')) {
+        var pause = cleaning && this._can(VF.pause);
+        this._$('gol').textContent = ptr(h, pause ? 'pause' : 'start');
+        this._$('goic').setAttribute('icon', pause ? 'mdi:pause' : 'mdi:play');
+        this._$('go').classList.toggle('on', cleaning);
+      }
+      if (this._$('home')) this._$('home').classList.toggle('on', s.state === 'returning' || s.state === 'docked');
+      var sta = this._$('station');
+      if (sta) sta.innerHTML = (c.station || []).filter(function (t) { return t && t.entity; }).map(function (t) {
+        var x = st(h, t.entity);
+        return '<div class="row"><div class="k"><ha-icon icon="' + esc(t.icon || (x && x.attributes.icon) || 'mdi:water') + '"></ha-icon><span>' +
+          esc(t.label || (x && x.attributes.friendly_name) || t.entity) + '</span></div><div class="v">' + esc(x ? stateText(h, x) : '—') + '</div></div>';
+      }).join('');
+      if (!this._lastMap) this._map(true);
+    }
+  }
+
+  class CasaFuturaVacuumCardEditor extends CFEditor {
+    _defaults() { return VACUUM_DEF; }
+    _data() { return Object.assign({}, VACUUM_DEF, this._config); }
+    _fromForm(v) {
+      var out = this._clean(v, this._defaults());
+      ['quick', 'station'].forEach(function (k) { if (v[k] && v[k].length) out[k] = v[k]; });
+      return out;
+    }
+    _schema() {
+      var sensor = function (name) { return { name: name, selector: { entity: { filter: { domain: ['sensor', 'binary_sensor', 'select', 'input_select'] } } } }; };
+      return [
+        this._section('s_main', 'mdi:robot-vacuum', [
+          { name: 'entity', selector: { entity: { filter: { domain: 'vacuum' } } } },
+          { type: 'grid', name: '', schema: [{ name: 'name', selector: { text: {} } }, { name: 'icon', selector: { icon: {} } }] },
+          { name: 'map', selector: { entity: { filter: { domain: ['camera', 'image'] } } } },
+          { name: 'show_controls', selector: { boolean: {} } }
+        ], true),
+        this._section('s_sensors', 'mdi:list-status', [
+          { name: 'battery', selector: { entity: { filter: { domain: 'sensor', device_class: 'battery' } } } },
+          sensor('status'), sensor('room'), sensor('area'), sensor('time'), sensor('error')
+        ]),
+        this._section('s_look', 'mdi:format-paint', this._lookSchema().concat([
+          { name: 'min_height', selector: { number: { min: 0, max: 900, step: 10, mode: 'slider', unit_of_measurement: 'px' } } }
+        ]))
+      ];
+    }
+    _lists() {
+      return [
+        { key: 'quick', title: 's_quick', help: 'quick_h', add: 'add_quick', labels: { label: 'q_label' },
+          newItem: function () { return { label: '', icon: 'mdi:broom', action: { action: 'perform-action' } }; },
+          schema: function () {
+            return [
+              { type: 'grid', name: '', schema: [{ name: 'label', selector: { text: {} } }, { name: 'icon', selector: { icon: {} } }, { name: 'color', selector: { color_rgb: {} } }] },
+              { name: 'action', selector: { ui_action: {} } }
+            ];
+          },
+          data: function (it) { return Object.assign({}, it, { color: rgbArr(rgb(it.color, ACC.violet)) }); } },
+        { key: 'station', title: 's_station', help: 'station_h', add: 'add_station', labels: { label: 'st_label' }, expanded: false,
+          newItem: function () { return { entity: '', label: '', icon: 'mdi:water' }; },
+          schema: function () {
+            return [
+              { name: 'entity', selector: { entity: {} } },
+              { type: 'grid', name: '', schema: [{ name: 'label', selector: { text: {} } }, { name: 'icon', selector: { icon: {} } }] }
+            ];
+          },
+          data: function (it) { return Object.assign({}, it); } }
+      ];
+    }
+  }
+
   /* ================================================================ registration */
 
   [
     ['casa-futura-gauge-card', CasaFuturaGaugeCard, 'Casa Futura · Gauge', 'A big needle gauge for any sensor, with colored zones.'],
     ['casa-futura-alerts-card', CasaFuturaAlertsCard, 'Casa Futura · Alerts bell', 'A floating bell that appears when something needs attention, with a side panel listing the alerts.'],
     ['casa-futura-action-card', CasaFuturaActionCard, 'Casa Futura · Action button', 'A button with optional confirmation, PIN and several choices (e.g. unlock, open, lock).'],
-    ['casa-futura-climate-card', CasaFuturaClimateCard, 'Casa Futura · Climate', 'A thermostat dial with modes, fan speed, presets and swing for any climate entity.']
+    ['casa-futura-climate-card', CasaFuturaClimateCard, 'Casa Futura · Climate', 'A thermostat dial with modes, fan speed, presets and swing for any climate entity.'],
+    ['casa-futura-light-card', CasaFuturaLightCard, 'Casa Futura · Light', 'A big brightness slider with white temperature, colors and the lights of a group.'],
+    ['casa-futura-vacuum-card', CasaFuturaVacuumCard, 'Casa Futura · Vacuum', 'Map, battery and controls of a robot vacuum, with quick cleanings and the station sensors.']
   ].forEach(function (d) {
     if (!customElements.get(d[0])) customElements.define(d[0], d[1]);
     window.customCards = window.customCards || [];
     window.customCards.push({ type: d[0], name: d[2], description: d[3], preview: true, documentationURL: REPO });
   });
   [['casa-futura-gauge-card-editor', CasaFuturaGaugeCardEditor], ['casa-futura-alerts-card-editor', CasaFuturaAlertsCardEditor],
-    ['casa-futura-action-card-editor', CasaFuturaActionCardEditor], ['casa-futura-climate-card-editor', CasaFuturaClimateCardEditor]].forEach(function (d) { if (!customElements.get(d[0])) customElements.define(d[0], d[1]); });
+    ['casa-futura-action-card-editor', CasaFuturaActionCardEditor], ['casa-futura-climate-card-editor', CasaFuturaClimateCardEditor],
+    ['casa-futura-light-card-editor', CasaFuturaLightCardEditor], ['casa-futura-vacuum-card-editor', CasaFuturaVacuumCardEditor]].forEach(function (d) { if (!customElements.get(d[0])) customElements.define(d[0], d[1]); });
   console.info('%c CASA FUTURA CARDS %c ' + VERSION + ' ', 'color:#0b0f1a;background:#5ff3ff;font-weight:700;border-radius:4px 0 0 4px', 'color:#5ff3ff;background:#0b0f1a;border-radius:0 4px 4px 0');
 })();
