@@ -7,6 +7,7 @@
  *   casa-futura-climate-card a thermostat dial with modes, fan speed, presets and swing
  *   casa-futura-light-card   a brightness slider with white temperature, colors and group members
  *   casa-futura-vacuum-card  a robot vacuum with map, battery, controls, quick cleanings and station
+ *   casa-futura-camera-card  camera snapshots in a strip or a grid, live video on tap
  *
  * https://github.com/ironblaster/casa-futura-cards
  * Released under the MIT License.
@@ -14,7 +15,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var REPO = 'https://github.com/ironblaster/casa-futura-cards';
   if (window.__casaFuturaCards) return;
   window.__casaFuturaCards = VERSION;
@@ -172,6 +173,15 @@
       start: 'Iniciar', pause: 'Pausa', stop: 'Parar', dock: 'Base', locate: 'Localizar', quick: 'Limpiezas rápidas', station: 'Estación',
       room: 'Habitación', area: 'Limpiado', time: 'Tiempo', no_map: 'Mapa no disponible' }
   };
+  // texts of the camera card
+  var CAMT = {
+    en: { person: 'Person', offline: 'Not available', cameras: 'Cameras', prev: 'Previous camera', next: 'Next camera' },
+    it: { person: 'Persona', offline: 'Non disponibile', cameras: 'Telecamere', prev: 'Telecamera precedente', next: 'Telecamera successiva' },
+    de: { person: 'Person', offline: 'Nicht verfügbar', cameras: 'Kameras', prev: 'Vorherige Kamera', next: 'Nächste Kamera' },
+    fr: { person: 'Personne', offline: 'Indisponible', cameras: 'Caméras', prev: 'Caméra précédente', next: 'Caméra suivante' },
+    es: { person: 'Persona', offline: 'No disponible', cameras: 'Cámaras', prev: 'Cámara anterior', next: 'Cámara siguiente' }
+  };
+  function camt(hass, k) { var t = CAMT[baseLang(langOf(hass))] || CAMT.en; return t[k] || CAMT.en[k]; }
   function ptr(hass, k) { var t = PT[baseLang(langOf(hass))] || PT.en; return t[k] || PT.en[k]; }
   function tr(hass, k, n) {
     var t = T[baseLang(langOf(hass))] || T.en, s = t[k] != null ? t[k] : T.en[k];
@@ -238,6 +248,7 @@
       '  background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.16),rgba(255,255,255,.04) 70%);border:1px solid rgba(255,255,255,.16);transition:transform .1s}' +
       '.key.fn{background:none;border-color:transparent;opacity:.75}.key.pressed{transform:scale(.9);background:rgba(var(--cf-acc),.35)}' +
       '.pad.off{opacity:.35;pointer-events:none}' +
+      '.dlg.wide{max-width:1100px;padding:18px 18px 16px;text-align:left}' +
       '</style><div class="scrim" id="scrim"><div class="glass dlg" id="dlg"></div></div>';
     lookVars(r.getElementById('scrim'), c);
     document.body.appendChild(p);
@@ -295,7 +306,11 @@
       area: 'Cleaned area', time: 'Cleaning time', error: 'Error', show_controls: 'Start, stop, dock and locate buttons',
       s_quick: 'Quick cleaning', quick_h: 'Buttons for the cleanings you start often: a script, a room, a whole floor.', add_quick: 'Add a quick cleaning',
       s_station: 'Station', station_h: 'Water tanks, dust bag and other sensors of the dock, shown as a list.', add_station: 'Add a station sensor',
-      q_label: 'Button text', st_label: 'Text'
+      q_label: 'Button text', st_label: 'Text',
+      layout: 'Layout', l_strip: 'Strip (scrolls sideways)', l_grid: 'Grid', columns: 'Columns of the grid', tile_width: 'Width of each camera in the strip',
+      refresh: 'Refresh the snapshots every', snapshot_width: 'Snapshot width', show_names: 'Show the names', show_title: 'Show the title', card_title: 'Title (optional)',
+      s_cameras: 'Cameras', cameras_h: 'Snapshots refresh only while the card is on screen. Tap a camera to watch it live.', add_camera: 'Add a camera',
+      occupancy: 'Badge sensor, e.g. person detected (optional)', badge: 'Badge text (optional)', cam_action: 'Tap action (empty: live video)'
     },
     it: {
       s_main: 'Principale', s_scale: 'Scala e colori', s_look: 'Aspetto', s_actions: 'Interazioni', s_bell: 'Campanella', s_choices: 'Scelte', s_alerts: 'Avvisi', s_security: 'Conferma e PIN',
@@ -319,7 +334,11 @@
       area: 'Superficie pulita', time: 'Tempo di pulizia', error: 'Errore', show_controls: 'Pulsanti avvia, stop, base e trova',
       s_quick: 'Pulizie rapide', quick_h: 'Pulsanti per le pulizie che avvii spesso: uno script, una stanza, un piano intero.', add_quick: 'Aggiungi una pulizia rapida',
       s_station: 'Stazione', station_h: 'Serbatoi dell’acqua, sacchetto della polvere e altri sensori della base, mostrati in elenco.', add_station: 'Aggiungi un sensore della stazione',
-      q_label: 'Testo del pulsante', st_label: 'Testo'
+      q_label: 'Testo del pulsante', st_label: 'Testo',
+      layout: 'Disposizione', l_strip: 'Striscia (scorre di lato)', l_grid: 'Griglia', columns: 'Colonne della griglia', tile_width: 'Larghezza di ogni telecamera nella striscia',
+      refresh: 'Aggiorna le immagini ogni', snapshot_width: 'Larghezza delle immagini', show_names: 'Mostra i nomi', show_title: 'Mostra il titolo', card_title: 'Titolo (facoltativo)',
+      s_cameras: 'Telecamere', cameras_h: 'Le immagini si aggiornano solo mentre la card è sullo schermo. Tocca una telecamera per vederla dal vivo.', add_camera: 'Aggiungi una telecamera',
+      occupancy: 'Sensore per il badge, es. persona rilevata (facoltativo)', badge: 'Testo del badge (facoltativo)', cam_action: 'Azione al tocco (vuota: video dal vivo)'
     }
   };
 
@@ -1677,6 +1696,274 @@
     }
   }
 
+  /* ================================================================ 7. camera: snapshots in a strip or a grid, live video on tap */
+
+  var CAMERA_DEF = Object.assign({ title: '', show_title: true, cameras: [], layout: 'strip', columns: 3, tile_width: 240,
+    refresh: 10, snapshot_width: 640, show_names: true }, LOOK_DEF);
+
+  // the camera proxy resizes on request: smaller pictures load fast on old tablets
+  function snapURL(s, w) {
+    var u = s && s.attributes.entity_picture;
+    if (!u) return null;
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'width=' + w + '&height=' + Math.round(w * 9 / 16) + '&t=' + Date.now();
+  }
+
+  // a badge sensor counts when it is on, or above zero (e.g. the number of people seen)
+  function badgeOn(o) { return !!o && (isActive(o) || (num(o.state) || 0) > 0); }
+
+  class CasaFuturaCameraCard extends HTMLElement {
+    static getConfigElement() { return document.createElement('casa-futura-camera-card-editor'); }
+    static getStubConfig(hass) {
+      var cams = Object.keys((hass && hass.states) || {}).filter(function (e) { return e.indexOf('camera.') === 0; }).slice(0, 3);
+      return { cameras: cams.map(function (e) { return { entity: e }; }) };
+    }
+    constructor() { super(); this.attachShadow({ mode: 'open' }); }
+    setConfig(c) {
+      if (!c || !Array.isArray(c.cameras) || !c.cameras.length) throw new Error('cameras is required: a list of camera entities');
+      var cams = c.cameras.map(function (x) { return typeof x === 'string' ? { entity: x } : x; }).filter(function (x) { return x && x.entity; });
+      this._config = Object.assign({}, CAMERA_DEF, c, { cameras: cams });
+      this._built = false;
+      if (this._hass) this._build();
+    }
+    set hass(h) {
+      var old = this._hass, c = this._config; this._hass = h;
+      if (this._live) this._live.hass = h;
+      if (!c) return;
+      if (!this._built) { this._build(); return; }
+      var ids = this._watch();
+      for (var i = 0; i < ids.length; i++) if (!old || old.states[ids[i]] !== h.states[ids[i]]) { this._update(); return; }
+    }
+    connectedCallback() {
+      var self = this, c = this._config;
+      if (!c) return;
+      clearInterval(this._iv);
+      this._iv = setInterval(function () { self._snap(); }, clamp(num(c.refresh) || 10, 2, 600) * 1000);
+      this._observe();
+      this._snap();
+    }
+    disconnectedCallback() {
+      clearInterval(this._iv); this._iv = null;
+      if (this._io) { this._io.disconnect(); this._io = null; }
+    }
+    getCardSize() { var c = this._config || CAMERA_DEF; return c.layout === 'grid' ? 2 + 2 * Math.ceil(c.cameras.length / (num(c.columns) || 3)) : 4; }
+    getGridOptions() { return { columns: 12, min_columns: 4 }; }
+    _$(id) { return this.shadowRoot.getElementById(id); }
+    _watch() {
+      return this._config.cameras.reduce(function (a, x) { a.push(x.entity); if (x.occupancy) a.push(x.occupancy); return a; }, []);
+    }
+    // refresh only while the card is on screen
+    _observe() {
+      var self = this, root = this._$('root');
+      if (this._io) this._io.disconnect();
+      if (!root || !window.IntersectionObserver) { this._visible = true; return; }
+      this._io = new IntersectionObserver(function (en) {
+        var v = en[0].isIntersecting;
+        if (v && !self._visible) { self._visible = true; self._snap(); } else self._visible = v;
+      });
+      this._io.observe(root);
+    }
+    _build() {
+      var c = this._config, h = this._hass, self = this, grid = c.layout === 'grid';
+      var cols = clamp(Math.round(num(c.columns) || 3), 1, 6), tw = clamp(Math.round(num(c.tile_width) || 240), 120, 800);
+      this.shadowRoot.innerHTML = '<style>' + BASE +
+        '.cc{display:block;padding:16px 0 14px}' +
+        '.tt{font-size:13px;letter-spacing:.2em;text-transform:uppercase;opacity:.6;margin:0 18px 12px}' +
+        '.wrap{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:0 14px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;' +
+        '  overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scroll-padding:0 14px}' +
+        '.wrap::-webkit-scrollbar{display:none}' +
+        '.wrap.grid{display:grid;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));gap:12px;overflow:visible;padding:0 14px 4px}' +
+        '.cm{position:relative;flex:none;width:' + tw + 'px;border-radius:20px;overflow:hidden;background:#000;scroll-snap-align:start;cursor:pointer;' +
+        '  border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 24px rgba(0,0,0,.35);transition:transform .12s;-webkit-tap-highlight-color:transparent}' +
+        '.grid .cm{width:auto;border-radius:22px}' +
+        '.cm.pressed{transform:scale(.96)}' +
+        // 16:9 box that also works on browsers without aspect-ratio
+        '.ar{position:relative;padding-top:56.25%}' +
+        '.ar img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}' +
+        '.nm{position:absolute;left:12px;right:12px;bottom:9px;font-size:15px;font-weight:600;text-shadow:0 1px 6px rgba(0,0,0,.85);' +
+        '  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}' +
+        '.grid .nm{font-size:17px;left:14px;bottom:11px}' +
+        '.bd{position:absolute;top:9px;left:9px;display:none;align-items:center;gap:5px;--ic:15px;min-height:28px;padding:0 10px;border-radius:999px;' +
+        '  font-size:12px;font-weight:600;color:#fff;background:rgba(' + ACC.amber + ',.85);box-shadow:0 0 18px rgba(' + ACC.amber + ',.6)}' +
+        '.bd.on{display:inline-flex}' +
+        '.off{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;gap:8px;--ic:22px;' +
+        '  font-size:14px;opacity:.7;background:rgba(10,14,24,.85)}' +
+        '.off.on{display:flex}' +
+        '</style><ha-card class="glass cc' + (c.glass === false ? ' plain' : '') + '" id="root">' +
+        (c.show_title !== false && c.title ? '<div class="tt">' + esc(c.title) + '</div>' : '') +
+        '<div class="wrap' + (grid ? ' grid' : '') + '" id="wrap">' + c.cameras.map(function (x, i) {
+          return '<div class="cm" data-i="' + i + '" role="button" tabindex="0"><div class="ar"><img alt=""></div>' +
+            (c.show_names !== false ? '<div class="nm"></div>' : '') +
+            '<div class="bd"><ha-icon icon="mdi:account"></ha-icon><span></span></div>' +
+            '<div class="off"><ha-icon icon="mdi:cctv-off"></ha-icon><span>' + esc(camt(h, 'offline')) + '</span></div></div>';
+        }).join('') + '</div></ha-card>';
+      lookVars(this._$('root'), c);
+      this._built = true;
+      var wrap = this._$('wrap');
+      // no picture swaps while scrolling: they make the strip stutter on slow tablets
+      wrap.addEventListener('scroll', function () { self._scrolled = Date.now(); }, { passive: true });
+      if (!grid) this._mouseDrag(wrap);
+      Array.prototype.forEach.call(wrap.querySelectorAll('.cm'), function (el) {
+        var i = +el.getAttribute('data-i');
+        el.addEventListener('pointerdown', function () { el.classList.add('pressed'); });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { el.addEventListener(t, function () { el.classList.remove('pressed'); }); });
+        el.addEventListener('click', function () { if (!self._dragged) self._tap(i); });
+        el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); self._tap(i); } });
+      });
+      if (this.isConnected) this._observe();
+      this._update();
+      this._snap(true);
+    }
+    // with a mouse the strip scrolls by dragging; fingers use the native scroll
+    _mouseDrag(wrap) {
+      var self = this, down = null;
+      wrap.addEventListener('pointerdown', function (e) {
+        if (e.pointerType !== 'mouse' || e.button) return;
+        down = { x: e.clientX, left: wrap.scrollLeft }; self._dragged = false;
+      });
+      wrap.addEventListener('pointermove', function (e) {
+        if (!down) return;
+        var dx = e.clientX - down.x;
+        if (Math.abs(dx) > 5) { self._dragged = true; wrap.style.scrollSnapType = 'none'; }
+        if (self._dragged) wrap.scrollLeft = down.left - dx;
+      });
+      var up = function () { if (!down) return; down = null; wrap.style.scrollSnapType = ''; setTimeout(function () { self._dragged = false; }, 0); };
+      wrap.addEventListener('pointerup', up); wrap.addEventListener('pointerleave', up);
+    }
+    _tap(i) {
+      var x = this._config.cameras[i]; haptic(this);
+      var a = x.tap_action;
+      if (a && a.action && a.action !== 'none') { runAction(this, a, x.entity); return; }
+      if (a && a.action === 'none') return;
+      this._openLive(i);
+    }
+    _snap(force) {
+      var c = this._config, h = this._hass, self = this;
+      if (!c || !h || !this._built) return;
+      if (!force && (document.hidden || this._visible === false || Date.now() - (this._scrolled || 0) < 1500)) return;
+      var w = clamp(Math.round(num(c.snapshot_width) || 640), 160, 1920);
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('.cm'), function (el) {
+        var s = st(h, c.cameras[+el.getAttribute('data-i')].entity), src = snapURL(s, w);
+        if (!src || s.state === 'unavailable') return;
+        // loaded aside, then swapped in: no flashes of black
+        var img = new Image();
+        img.alt = ''; img.decoding = 'async';
+        img.onload = function () { var o = el.querySelector('img'); if (o && o.parentNode) o.parentNode.replaceChild(img, o); };
+        img.src = src;
+      });
+      if (this._liveImg) this._liveImg();
+    }
+    _update() {
+      var c = this._config, h = this._hass;
+      Array.prototype.forEach.call(this.shadowRoot.querySelectorAll('.cm'), function (el) {
+        var x = c.cameras[+el.getAttribute('data-i')], s = st(h, x.entity), o = x.occupancy ? st(h, x.occupancy) : null;
+        var nm = el.querySelector('.nm');
+        if (nm) nm.textContent = x.name || (s && s.attributes.friendly_name) || x.entity;
+        el.setAttribute('aria-label', x.name || (s && s.attributes.friendly_name) || x.entity);
+        var bd = el.querySelector('.bd'), on = badgeOn(o);
+        bd.classList.toggle('on', on);
+        bd.querySelector('span').textContent = x.badge || camt(h, 'person');
+        el.querySelector('.off').classList.toggle('on', !s || s.state === 'unavailable');
+      });
+    }
+    // live video in a dialog drawn by the card, with arrows to move between cameras
+    _openLive(i) {
+      var self = this, c = this._config, cams = c.cameras;
+      openDialog(this, c, function (api) {
+        api.el.classList.add('wide');
+        var st2 = document.createElement('style');
+        st2.textContent = '.lh{display:flex;align-items:center;gap:12px;margin:0 2px 12px}.lh .t{flex:1;min-width:0;font-size:20px;font-weight:600;' +
+          '  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+          '.ib{--ic:24px;width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex:none;' +
+          '  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);transition:transform .1s}.ib:active{transform:scale(.9)}' +
+          '.lv{position:relative;border-radius:20px;overflow:hidden;background:#000;--ha-card-border-radius:0;--ha-card-border-width:0;--ha-card-background:#000}' +
+          '.lv .ar{position:relative;padding-top:56.25%}.lv .ar>*{position:absolute;top:0;left:0;width:100%;height:100%}' +
+          '.lv img{object-fit:contain;display:block}' +
+          '.bd{position:absolute;top:12px;left:12px;z-index:2;display:none;align-items:center;gap:6px;--ic:16px;min-height:30px;padding:0 12px;border-radius:999px;' +
+          '  font-size:13px;font-weight:600;color:#fff;background:rgba(' + ACC.amber + ',.85);box-shadow:0 0 18px rgba(' + ACC.amber + ',.6)}.bd.on{display:inline-flex}';
+        api.root.appendChild(st2);
+        var many = cams.length > 1;
+        api.el.innerHTML = '<div class="lh">' + (many ? '<button class="ib" id="pv" aria-label="' + esc(camt(self._hass, 'prev')) + '"><ha-icon icon="mdi:chevron-left"></ha-icon></button>' : '') +
+          '<div class="t" id="lt"></div>' + (many ? '<button class="ib" id="nx" aria-label="' + esc(camt(self._hass, 'next')) + '"><ha-icon icon="mdi:chevron-right"></ha-icon></button>' : '') +
+          '<button class="ib" id="cl" aria-label="' + esc(tr(self._hass, 'close')) + '"><ha-icon icon="mdi:close"></ha-icon></button></div>' +
+          '<div class="lv"><div class="bd" id="lb"><ha-icon icon="mdi:account"></ha-icon><span></span></div><div class="ar" id="la"></div></div>';
+        var la = api.root.getElementById('la'), cur = i, token = 0;
+        function show(n) {
+          cur = (n + cams.length) % cams.length;
+          var x = cams[cur], s = st(self._hass, x.entity), my = ++token;
+          api.root.getElementById('lt').textContent = x.name || (s && s.attributes.friendly_name) || x.entity;
+          var o = x.occupancy ? st(self._hass, x.occupancy) : null, lb = api.root.getElementById('lb');
+          lb.classList.toggle('on', badgeOn(o)); lb.querySelector('span').textContent = x.badge || camt(self._hass, 'person');
+          la.innerHTML = ''; self._live = null; self._liveImg = null;
+          // a snapshot first, replaced by Home Assistant's own live player as soon as it is ready
+          var img = document.createElement('img'); img.alt = ''; la.appendChild(img);
+          var w = clamp(Math.round(num(c.snapshot_width) || 640), 160, 1920) * 2;
+          self._liveImg = function () { var u = snapURL(st(self._hass, x.entity), w); if (u && img.isConnected) img.src = u; };
+          self._liveImg();
+          if (!window.loadCardHelpers) return;
+          window.loadCardHelpers().then(function (hp) {
+            return hp.createCardElement({ type: 'picture-entity', entity: x.entity, camera_view: 'live', show_name: false, show_state: false,
+              tap_action: { action: 'none' }, hold_action: { action: 'none' } });
+          }).then(function (card) {
+            if (my !== token || !la.isConnected) return;
+            card.hass = self._hass; la.appendChild(card); self._live = card;
+            setTimeout(function () { if (my === token && img.parentNode) { img.parentNode.removeChild(img); self._liveImg = null; } }, 1500);
+          }).catch(function () { /* the snapshot stays */ });
+        }
+        var close = api.close;
+        api.close = function () { token++; self._live = null; self._liveImg = null; document.removeEventListener('keydown', keys); close(); };
+        // Escape and a tap outside already close the dialog
+        function keys(e) { if (!many) return; if (e.key === 'ArrowLeft') show(cur - 1); if (e.key === 'ArrowRight') show(cur + 1); }
+        document.addEventListener('keydown', keys);
+        api.root.getElementById('cl').addEventListener('click', function () { api.close(); });
+        if (many) {
+          api.root.getElementById('pv').addEventListener('click', function () { haptic(self); show(cur - 1); });
+          api.root.getElementById('nx').addEventListener('click', function () { haptic(self); show(cur + 1); });
+        }
+        show(i);
+      });
+    }
+  }
+
+  class CasaFuturaCameraCardEditor extends CFEditor {
+    _defaults() { return CAMERA_DEF; }
+    _data() { return Object.assign({}, CAMERA_DEF, this._config); }
+    _fromForm(v) {
+      var out = this._clean(v, this._defaults());
+      if (v.cameras && v.cameras.length) out.cameras = v.cameras;
+      return out;
+    }
+    _schema() {
+      var L = this._L.bind(this), c = this._config, grid = c.layout === 'grid';
+      return [
+        this._section('s_main', 'mdi:cctv', [
+          { type: 'grid', name: '', schema: [{ name: 'title', title: L('card_title'), selector: { text: {} } }, { name: 'show_title', selector: { boolean: {} } }] },
+          { name: 'layout', selector: { select: { mode: 'box', options: [{ value: 'strip', label: L('l_strip') }, { value: 'grid', label: L('l_grid') }] } } },
+          grid ? { name: 'columns', selector: { number: { min: 1, max: 6, step: 1, mode: 'slider' } } }
+            : { name: 'tile_width', selector: { number: { min: 120, max: 800, step: 10, mode: 'slider', unit_of_measurement: 'px' } } },
+          { name: 'show_names', selector: { boolean: {} } },
+          { type: 'grid', name: '', schema: [
+            { name: 'refresh', selector: { number: { min: 2, max: 600, step: 1, mode: 'box', unit_of_measurement: 's' } } },
+            { name: 'snapshot_width', selector: { number: { min: 160, max: 1920, step: 10, mode: 'box', unit_of_measurement: 'px' } } }
+          ] }
+        ], true),
+        this._section('s_look', 'mdi:format-paint', this._lookSchema())
+      ];
+    }
+    _lists() {
+      return [{ key: 'cameras', title: 's_cameras', help: 'cameras_h', add: 'add_camera', labels: { tap_action: 'cam_action' },
+        newItem: function () { return { entity: '' }; },
+        schema: function () {
+          return [
+            { name: 'entity', selector: { entity: { filter: { domain: 'camera' } } } },
+            { type: 'grid', name: '', schema: [{ name: 'name', selector: { text: {} } }, { name: 'badge', selector: { text: {} } }] },
+            { name: 'occupancy', selector: { entity: { filter: { domain: ['binary_sensor', 'input_boolean', 'sensor'] } } } },
+            { name: 'tap_action', selector: { ui_action: {} } }
+          ];
+        },
+        data: function (it) { return Object.assign({}, it); } }];
+    }
+  }
+
   /* ================================================================ registration */
 
   [
@@ -1685,7 +1972,8 @@
     ['casa-futura-action-card', CasaFuturaActionCard, 'Casa Futura · Action button', 'A button with optional confirmation, PIN and several choices (e.g. unlock, open, lock).'],
     ['casa-futura-climate-card', CasaFuturaClimateCard, 'Casa Futura · Climate', 'A thermostat dial with modes, fan speed, presets and swing for any climate entity.'],
     ['casa-futura-light-card', CasaFuturaLightCard, 'Casa Futura · Light', 'A big brightness slider with white temperature, colors and the lights of a group.'],
-    ['casa-futura-vacuum-card', CasaFuturaVacuumCard, 'Casa Futura · Vacuum', 'Map, battery and controls of a robot vacuum, with quick cleanings and the station sensors.']
+    ['casa-futura-vacuum-card', CasaFuturaVacuumCard, 'Casa Futura · Vacuum', 'Map, battery and controls of a robot vacuum, with quick cleanings and the station sensors.'],
+    ['casa-futura-camera-card', CasaFuturaCameraCard, 'Casa Futura · Cameras', 'Camera snapshots in a strip or a grid that refresh while on screen, with live video on tap.']
   ].forEach(function (d) {
     if (!customElements.get(d[0])) customElements.define(d[0], d[1]);
     window.customCards = window.customCards || [];
@@ -1693,6 +1981,7 @@
   });
   [['casa-futura-gauge-card-editor', CasaFuturaGaugeCardEditor], ['casa-futura-alerts-card-editor', CasaFuturaAlertsCardEditor],
     ['casa-futura-action-card-editor', CasaFuturaActionCardEditor], ['casa-futura-climate-card-editor', CasaFuturaClimateCardEditor],
-    ['casa-futura-light-card-editor', CasaFuturaLightCardEditor], ['casa-futura-vacuum-card-editor', CasaFuturaVacuumCardEditor]].forEach(function (d) { if (!customElements.get(d[0])) customElements.define(d[0], d[1]); });
+    ['casa-futura-light-card-editor', CasaFuturaLightCardEditor], ['casa-futura-vacuum-card-editor', CasaFuturaVacuumCardEditor],
+    ['casa-futura-camera-card-editor', CasaFuturaCameraCardEditor]].forEach(function (d) { if (!customElements.get(d[0])) customElements.define(d[0], d[1]); });
   console.info('%c CASA FUTURA CARDS %c ' + VERSION + ' ', 'color:#0b0f1a;background:#5ff3ff;font-weight:700;border-radius:4px 0 0 4px', 'color:#5ff3ff;background:#0b0f1a;border-radius:0 4px 4px 0');
 })();

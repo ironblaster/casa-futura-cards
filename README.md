@@ -26,6 +26,7 @@ Liquid glass cards for Home Assistant dashboards and wall tablets. Big, readable
 | `custom:casa-futura-climate-card` | A thermostat dial for any climate entity: drag the ring or use − and +, with modes, fan speed, presets and swing. |
 | `custom:casa-futura-light-card` | A big brightness slider with white temperature, colors and the lights of a group, each with its own switch. |
 | `custom:casa-futura-vacuum-card` | A robot vacuum with its map, battery, start / stop / dock / locate, your quick cleanings and the station sensors. |
+| `custom:casa-futura-camera-card` | Camera snapshots in a strip or a grid, a badge when a person is seen, live video on tap. Light enough for old wall tablets. |
 
 All of them:
 
@@ -46,7 +47,7 @@ All of them:
 ### Manual
 
 1. Download `casa-futura-cards.js` from the [latest release](https://github.com/ironblaster/casa-futura-cards/releases) into `config/www/`.
-2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.2.0` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
+2. In **Settings → Dashboards → ⋮ → Resources** add `/local/casa-futura-cards.js?v=1.3.0` as a **JavaScript module**. When you update the file by hand, change the `?v=` number too: Home Assistant lets browsers cache files in `/local` for a long time.
 
 ## Gauge
 
@@ -235,6 +236,37 @@ The map refreshes every 5 seconds while the robot cleans or returns, every minut
 | `station` | | Rows with `entity`, `label` and `icon` for tanks, dust bag and other dock sensors. |
 | `min_height` | | In pixels. |
 
+## Cameras
+
+![Cameras](https://raw.githubusercontent.com/ironblaster/casa-futura-cards/main/images/camera.png)
+
+```yaml
+type: custom:casa-futura-camera-card
+title: Cameras
+layout: grid            # or strip
+columns: 3
+cameras:
+  - entity: camera.garden
+    occupancy: binary_sensor.garden_person_occupancy   # optional badge, e.g. from Frigate
+  - entity: camera.garage
+  - entity: camera.living_room
+```
+
+The card shows snapshots, not video streams, so a dozen cameras stay smooth even on an old Android tablet. Pictures are asked to Home Assistant at the size they are shown, loaded aside and swapped in without flashes, and they refresh only while the card is on screen and you are not scrolling. Tap a camera to watch it live in a window drawn by the card (Home Assistant's own player, WebRTC or HLS), with arrows to move to the other cameras.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `cameras` | required | The list of cameras, see below. A plain list of entity ids works too. |
+| `title`, `show_title` | | Title above the cameras. |
+| `layout` | `strip` | `strip` scrolls sideways (with a finger, or by dragging with the mouse); `grid` shows all the cameras. |
+| `columns` | `3` | Columns of the grid. |
+| `tile_width` | `240` | Width of each camera in the strip, in pixels. |
+| `refresh` | `10` | Seconds between two snapshots. |
+| `snapshot_width` | `640` | Width of the pictures asked to Home Assistant. The live window uses twice as much. |
+| `show_names` | `true` | Names over the pictures. |
+
+Each camera: `entity`, `name`, `occupancy` (a sensor that shows the badge when it is on or above zero), `badge` (its text, default "Person"), `tap_action` (default: the live window; any standard action, e.g. `more-info` or `navigate`).
+
 ## Appearance (all cards)
 
 | Option | Default | Description |
@@ -258,7 +290,7 @@ If Casa Futura makes your home a little nicer, you can [sponsor the project on G
 ## The Casa Futura family
 
 - [Glass Clock Weather Card](https://github.com/ironblaster/glass-clock-weather-card): a big clock with animated weather.
-- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): gauge, alerts bell, action buttons with PIN, climate, light and vacuum.
+- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): gauge, alerts bell, action buttons with PIN, climate, light, vacuum and cameras.
 - [Casa Futura Theme](https://github.com/ironblaster/casa-futura-theme): the dark liquid glass theme.
 
 ## License

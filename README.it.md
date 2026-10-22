@@ -21,6 +21,7 @@ Card in stile vetro per le dashboard di Home Assistant e i tablet a muro: grandi
 | `custom:casa-futura-climate-card` | Una ghiera per qualsiasi condizionatore o termostato: si trascina l'anello o si usano − e +, con modalità, ventola, preset e oscillazione. |
 | `custom:casa-futura-light-card` | Un grande cursore per la luminosità, con temperatura del bianco, colori e le luci di un gruppo, ognuna con il suo interruttore. |
 | `custom:casa-futura-vacuum-card` | Il robot aspirapolvere con mappa, batteria, avvia / stop / base / trova, le tue pulizie rapide e i sensori della stazione. |
+| `custom:casa-futura-camera-card` | Le immagini delle telecamere in una striscia o in una griglia, un badge quando c'è una persona, il video dal vivo al tocco. Leggera anche per i tablet a muro vecchi. |
 
 Tutte hanno l'editor visuale per ogni opzione, usano le azioni standard di Home Assistant, **non richiedono browser_mod** (le finestre di conferma e PIN le disegnano le card) e sono tradotte in italiano, inglese, tedesco, francese e spagnolo.
 
@@ -35,7 +36,7 @@ Tutte hanno l'editor visuale per ogni opzione, usano le azioni standard di Home 
 ### A mano
 
 1. Scarica `casa-futura-cards.js` dall'[ultima versione](https://github.com/ironblaster/casa-futura-cards/releases) e copialo in `config/www/`.
-2. In **Impostazioni → Plance → ⋮ → Risorse** aggiungi `/local/casa-futura-cards.js?v=1.2.0` come **modulo JavaScript**. Quando aggiorni il file a mano cambia anche il numero dopo `?v=`, perché Home Assistant lascia i file di `/local` a lungo nella cache del browser.
+2. In **Impostazioni → Plance → ⋮ → Risorse** aggiungi `/local/casa-futura-cards.js?v=1.3.0` come **modulo JavaScript**. Quando aggiorni il file a mano cambia anche il numero dopo `?v=`, perché Home Assistant lascia i file di `/local` a lungo nella cache del browser.
 
 ## Esempio: robot con mappa e pulizie rapide
 
@@ -73,6 +74,24 @@ exclude:                       # facoltativo: luci del gruppo da non mostrare
 ```
 
 Il cursore è verticale sulle card larghe e diventa orizzontale quando la card è stretta; portandolo in fondo la luce si spegne. Temperatura del bianco e colori compaiono solo se la luce li supporta.
+
+## Esempio: telecamere in griglia
+
+![Telecamere](https://raw.githubusercontent.com/ironblaster/casa-futura-cards/main/images/camera.png)
+
+```yaml
+type: custom:casa-futura-camera-card
+title: Telecamere
+layout: grid            # oppure strip
+columns: 3
+cameras:
+  - entity: camera.giardino
+    occupancy: binary_sensor.giardino_person_occupancy   # facoltativo: badge, per esempio da Frigate
+  - entity: camera.garage
+  - entity: camera.salotto
+```
+
+La card mostra immagini e non flussi video, così anche una decina di telecamere scorrono fluide su un tablet Android vecchio. Le immagini si aggiornano solo mentre la card è sullo schermo e non stai scorrendo. Toccando una telecamera si apre il video dal vivo, con le frecce per passare alle altre. Tutte le opzioni sono nel [README in inglese](README.md#cameras) e nell'editor visuale.
 
 ## Esempio: porta con PIN e tre scelte
 
@@ -119,7 +138,7 @@ Se Casa Futura ti piace, puoi [sostenere il progetto su GitHub Sponsors](https:/
 ## La famiglia Casa Futura
 
 - [Glass Clock Weather Card](https://github.com/ironblaster/glass-clock-weather-card): un orologio grande con il meteo animato.
-- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): quadrante, campanella degli avvisi e pulsanti con PIN.
+- [Casa Futura Cards](https://github.com/ironblaster/casa-futura-cards): quadrante, campanella degli avvisi, pulsanti con PIN, clima, luci, robot e telecamere.
 - [Casa Futura Theme](https://github.com/ironblaster/casa-futura-theme): il tema scuro in stile vetro.
 
 ## Licenza

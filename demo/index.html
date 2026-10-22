@@ -64,7 +64,14 @@ const hass = {
     'sensor.robot_error': S('sensor.robot_error', 'no_error', {}),
     'sensor.clean_water': S('sensor.clean_water', 'Installed', {}),
     'sensor.dirty_water': S('sensor.dirty_water', 'Installed', {}),
-    'sensor.dust_bag': S('sensor.dust_bag', 'Installed', {})
+    'sensor.dust_bag': S('sensor.dust_bag', 'Installed', {}),
+    'camera.garden': S('camera.garden', 'idle', { friendly_name: 'Garden', entity_picture: 'cams/garden.svg' }),
+    'camera.terrace': S('camera.terrace', 'idle', { friendly_name: 'Terrace', entity_picture: 'cams/terrace.svg' }),
+    'camera.garage': S('camera.garage', 'idle', { friendly_name: 'Garage', entity_picture: 'cams/garage.svg' }),
+    'camera.living_room': S('camera.living_room', 'idle', { friendly_name: 'Living room', entity_picture: 'cams/living.svg' }),
+    'camera.kitchen': S('camera.kitchen', 'idle', { friendly_name: 'Kitchen', entity_picture: 'cams/kitchen.svg' }),
+    'camera.bedroom': S('camera.bedroom', 'unavailable', { friendly_name: 'Bedroom', entity_picture: 'cams/room.svg' }),
+    'binary_sensor.garden_person': S('binary_sensor.garden_person', 'on', { friendly_name: 'Person in the garden' })
   },
   callService: (d, s, data) => window.__events.push({ service: d + '.' + s, data }),
   formatEntityState: (s) => ({ locked: 'Locked', unlocked: 'Unlocked', on: 'On', off: 'Off', heat: 'Heat', cool: 'Cool', docked: 'Docked', cleaning: 'Cleaning', sleeping: 'Sleeping' }[s.state] || s.state + (s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : '')),
@@ -73,6 +80,8 @@ const hass = {
 window.__events = [];
 window.addEventListener('hass-action', (e) => window.__events.push(e.detail));
 
+const CAMS = [{ entity: 'camera.garden', occupancy: 'binary_sensor.garden_person' }, { entity: 'camera.terrace' }, { entity: 'camera.garage' },
+  { entity: 'camera.living_room' }, { entity: 'camera.kitchen' }, { entity: 'camera.bedroom' }];
 const ONLY = {
   climate: [['', { type: 'custom:casa-futura-climate-card', entity: 'climate.bedroom' }]],
   light: [['', { type: 'custom:casa-futura-light-card', entity: 'light.living_room', exclude: ['light.wall_switch'] }]],
@@ -81,7 +90,9 @@ const ONLY = {
     quick: [{ label: 'Clean the bathroom', icon: 'mdi:shower-head', action: { action: 'perform-action', perform_action: 'script.clean_bathroom' } },
             { label: 'Clean the 1st floor', icon: 'mdi:home-floor-1', action: { action: 'perform-action', perform_action: 'vacuum.start' } }],
     station: [{ entity: 'sensor.clean_water', label: 'Clean water', icon: 'mdi:water' }, { entity: 'sensor.dirty_water', label: 'Dirty water', icon: 'mdi:water-opacity' },
-              { entity: 'sensor.dust_bag', label: 'Dust bag', icon: 'mdi:delete-variant' }] }]]
+              { entity: 'sensor.dust_bag', label: 'Dust bag', icon: 'mdi:delete-variant' }] }]],
+  camera: [['', { type: 'custom:casa-futura-camera-card', title: 'Cameras · tap for live video', layout: 'grid', columns: 3, cameras: CAMS }]],
+  'camera-strip': [['', { type: 'custom:casa-futura-camera-card', title: 'Cameras', cameras: CAMS }]]
 };
 const cards = ONLY[Q.get('only')] || [
   ['wide', { type: 'custom:casa-futura-gauge-card', entity: 'sensor.power', name: 'Power now', icon: 'mdi:flash', min: 0, max: 5500, yellow_from: 3500, red_from: 5000 }],
@@ -111,6 +122,7 @@ s.onload = () => {
   setTimeout(() => {
     if (Q.get('open') === 'pin') document.querySelectorAll('casa-futura-action-card')[0].shadowRoot.getElementById('b').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })),
       document.querySelectorAll('casa-futura-action-card')[0].shadowRoot.getElementById('b').dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    if (Q.get('open') === 'live') document.querySelector('casa-futura-camera-card').shadowRoot.querySelector('.cm').click();
     if (Q.get('open') === 'bell') { const r = document.querySelector('[data-casa-futura-alerts]').shadowRoot; r.getElementById('pan').style.transition = 'none'; r.getElementById('scrim').style.transition = 'none'; r.getElementById('bell').click(); }
   }, 400);
 };
